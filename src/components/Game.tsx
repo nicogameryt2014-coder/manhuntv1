@@ -33,6 +33,8 @@ type TouchMove = { x: number; y: number };
 
 const VW = 960;
 const VH = 620;
+const MOBILE_VW = 620;
+const MOBILE_VH = 900;
 
 export function Game() {
   const [fase, setFase] = useState<Fase>("menu");
@@ -44,6 +46,7 @@ export function Game() {
   const [hud, setHud] = useState<Hud | null>(null);
   const [tactil, setTactil] = useState(false);
   const [palanca, setPalanca] = useState<TouchMove>({ x: 0, y: 0 });
+  const [vista, setVista] = useState({ w: VW, h: VH });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState | null>(null);
@@ -72,10 +75,18 @@ export function Game() {
 
   useEffect(() => {
     const query = window.matchMedia("(pointer: coarse), (max-width: 767px)");
-    const actualizar = () => setTactil(query.matches);
+    const actualizar = () => {
+      setTactil(query.matches);
+      const vertical = query.matches && window.innerHeight > window.innerWidth;
+      setVista(vertical ? { w: MOBILE_VW, h: MOBILE_VH } : { w: VW, h: VH });
+    };
     actualizar();
     query.addEventListener("change", actualizar);
-    return () => query.removeEventListener("change", actualizar);
+    window.addEventListener("resize", actualizar);
+    return () => {
+      query.removeEventListener("change", actualizar);
+      window.removeEventListener("resize", actualizar);
+    };
   }, []);
 
   useEffect(() => {
@@ -130,7 +141,7 @@ export function Game() {
       };
       pulsos.current = { habilidad: false, recoger: false, item: null, cancelar: false };
       step(st, dt, input);
-      render(ctx, st, VW, VH, debugRef.current);
+      render(ctx, st, vista.w, vista.h, debugRef.current);
 
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
@@ -159,7 +170,7 @@ export function Game() {
       touchMove.current = { x: 0, y: 0 };
       touchRun.current = false;
     };
-  }, [fase]);
+  }, [fase, vista]);
 
   const moverPalanca = (ev: ReactPointerEvent<HTMLDivElement>) => {
     const rect = ev.currentTarget.getBoundingClientRect();
@@ -321,9 +332,9 @@ export function Game() {
       <div className="game-stage relative w-full max-w-[960px] overflow-hidden rounded-lg border border-border sm:rounded-xl">
         <canvas
           ref={canvasRef}
-          width={VW}
-          height={VH}
-          className="block aspect-[48/31] h-auto w-full touch-none bg-card shadow-2xl"
+          width={vista.w}
+          height={vista.h}
+          className="block h-auto max-h-[calc(100dvh-11rem)] w-full touch-none bg-card object-contain shadow-2xl sm:max-h-none"
         />
 
         {/* HUD */}
