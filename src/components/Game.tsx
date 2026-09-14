@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
+import { Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   ABILITY_INFO,
   ITEM_INFO,
@@ -27,6 +29,8 @@ type Hud = {
   escudoActivo: boolean;
 };
 
+type TouchMove = { x: number; y: number };
+
 const VW = 960;
 const VH = 620;
 
@@ -38,6 +42,8 @@ export function Game() {
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
+  const [tactil, setTactil] = useState(false);
+  const [palanca, setPalanca] = useState<TouchMove>({ x: 0, y: 0 });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState | null>(null);
@@ -46,6 +52,8 @@ export function Game() {
     { habilidad: false, recoger: false, item: null, cancelar: false },
   );
   const debugRef = useRef(debug);
+  const touchMove = useRef<TouchMove>({ x: 0, y: 0 });
+  const touchRun = useRef(false);
   debugRef.current = debug;
 
   const iniciar = useCallback(
@@ -61,6 +69,14 @@ export function Game() {
     [nSobrevivientes, nAsesinos],
   );
 
+
+  useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse), (max-width: 767px)");
+    const actualizar = () => setTactil(query.matches);
+    actualizar();
+    query.addEventListener("change", actualizar);
+    return () => query.removeEventListener("change", actualizar);
+  }, []);
 
   useEffect(() => {
     const down = (ev: KeyboardEvent) => {
@@ -86,9 +102,11 @@ export function Game() {
 
   useEffect(() => {
     if (fase !== "jugando") return;
+    document.body.classList.add("game-active");
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     let raf = 0;
     let last = performance.now();
 
@@ -100,11 +118,11 @@ export function Game() {
       last = now;
       const k = keys.current;
       const input: Input = {
-        up: !!(k["w"] || k["arrowup"]),
-        down: !!(k["s"] || k["arrowdown"]),
-        left: !!(k["a"] || k["arrowleft"]),
-        right: !!(k["d"] || k["arrowright"]),
-        run: !!(k["shift"]),
+        up: !!(k["w"] || k["arrowup"] || touchMove.current.y < -0.25),
+        down: !!(k["s"] || k["arrowdown"] || touchMove.current.y > 0.25),
+        left: !!(k["a"] || k["arrowleft"] || touchMove.current.x < -0.25),
+        right: !!(k["d"] || k["arrowright"] || touchMove.current.x > 0.25),
+        run: !!(k["shift"] || touchRun.current),
         usarHabilidad: pulsos.current.habilidad,
         recoger: pulsos.current.recoger,
         usarItem: pulsos.current.item,
@@ -114,7 +132,8 @@ export function Game() {
       step(st, dt, input);
       render(ctx, st, VW, VH, debugRef.current);
 
-      const p = st.entities.find((e) => e.isPlayer)!;
+      const p = st.entities.find((e) => e.isPlayer);
+      if (!p) return;
       setHud({
         hp: Math.max(0, Math.round(p.hp)),
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
@@ -134,23 +153,55 @@ export function Game() {
       });
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.classList.remove("game-active");
+      touchMove.current = { x: 0, y: 0 };
+      touchRun.current = false;
+    };
   }, [fase]);
+
+  const moverPalanca = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const dx = ev.clientX - (rect.left + rect.width / 2);
+    const dy = ev.clientY - (rect.top + rect.height / 2);
+    const limite = rect.width * 0.32;
+    const distancia = Math.hypot(dx, dy);
+    const escala = distancia > limite ? limite / distancia : 1;
+    const siguiente = { x: (dx * escala) / limite, y: (dy * escala) / limite };
+    touchMove.current = siguiente;
+    setPalanca(siguiente);
+  };
+
+  const iniciarPalanca = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    moverPalanca(ev);
+  };
+
+  const soltarPalanca = () => {
+    touchMove.current = { x: 0, y: 0 };
+    setPalanca({ x: 0, y: 0 });
+  };
+
+  const pulsar = (accion: "habilidad" | "recoger" | "cancelar", item?: ItemKind) => {
+    if (item) pulsos.current.item = item;
+    else pulsos.current[accion] = true;
+  };
 
   if (fase === "menu") {
     return (
       <main className="min-h-screen bg-background text-foreground">
-        <div className="mx-auto max-w-3xl px-6 py-16">
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-16">
           <p className="font-mono text-xs uppercase tracking-[0.4em] text-primary">
             Asesinos vs sobrevivientes
           </p>
-          <h1 className="mt-3 text-5xl font-black tracking-tight">Último Turno</h1>
+          <h1 className="mt-3 text-4xl font-black sm:text-5xl">Último Turno</h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Sobrevive 3 minutos. Dos asesinos te persiguen: el Venenoso y el Ninja. Elige tu
             habilidad y busca botiquines y colas por el mapa.
           </p>
 
-          <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-widest text-muted-foreground sm:mt-10">
             Elige tu habilidad
           </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -158,7 +209,7 @@ export function Game() {
               <button
                 key={a}
                 onClick={() => setHabilidad(a)}
-                className={`rounded-xl border p-4 text-left transition-colors ${
+                className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
                   habilidad === a
                     ? "border-primary bg-primary/10"
                     : "border-border bg-card hover:bg-accent"
@@ -213,14 +264,15 @@ export function Game() {
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <button
+          <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+            <Button
               onClick={() => iniciar(habilidad)}
-              className="rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              size="lg"
+              className="h-12 w-full sm:w-auto"
             >
               Empezar partida
-            </button>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm">
+            </Button>
+            <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm">
               <input
                 type="checkbox"
                 checked={debug}
@@ -235,6 +287,7 @@ export function Game() {
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="text-sm font-semibold">Controles</h3>
               <ul className="mt-2 space-y-1 font-mono text-xs text-muted-foreground">
+                <li className="sm:hidden">Palanca y botones en pantalla</li>
                 <li>WASD / flechas — mover</li>
                 <li>Shift — correr</li>
                 <li>Espacio — habilidad</li>
@@ -264,20 +317,20 @@ export function Game() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-6 text-foreground">
-      <div className="relative" style={{ width: VW, maxWidth: "100%" }}>
+    <main className="game-screen flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-2 py-2 text-foreground sm:px-4 sm:py-6">
+      <div className="game-stage relative w-full max-w-[960px] overflow-hidden rounded-lg border border-border sm:rounded-xl">
         <canvas
           ref={canvasRef}
           width={VW}
           height={VH}
-          className="w-full rounded-xl border border-border bg-card shadow-2xl"
+          className="block aspect-[48/31] h-auto w-full touch-none bg-card shadow-2xl"
         />
 
         {/* HUD */}
         {hud && (
           <>
-            <div className="pointer-events-none absolute left-4 top-4 w-64 space-y-2">
-              <div className="rounded-lg bg-black/60 p-3 backdrop-blur">
+            <div className="pointer-events-none absolute left-2 top-2 w-[min(15rem,62%)] space-y-1 sm:left-4 sm:top-4 sm:w-64 sm:space-y-2">
+              <div className="rounded-md bg-background/80 p-2 backdrop-blur sm:rounded-lg sm:p-3">
                 <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
                   <span>{ABILITY_INFO[habilidad].nombre}</span>
                   <span>{hud.hp} HP{hud.escudo ? ` +${hud.escudo}` : ""}</span>
@@ -305,7 +358,7 @@ export function Game() {
                 </div>
               </div>
               {hud.canal && (
-                <div className="rounded-lg bg-black/60 p-3 backdrop-blur">
+              <div className="rounded-md bg-background/80 p-2 backdrop-blur sm:rounded-lg sm:p-3">
                   <div className="font-mono text-[11px]">Usando {hud.canal.nombre}…</div>
                   <div className="mt-1 h-2 rounded bg-white/10">
                     <div
@@ -317,46 +370,48 @@ export function Game() {
               )}
             </div>
 
-            <div className="pointer-events-none absolute right-4 top-4 space-y-2 text-right">
-              <div className="rounded-lg bg-black/60 px-3 py-2 font-mono text-sm backdrop-blur">
+            <div className="pointer-events-none absolute right-2 top-2 space-y-1 text-right sm:right-4 sm:top-4 sm:space-y-2">
+              <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-xs backdrop-blur sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm">
                 {Math.floor(hud.tiempo / 60)}:{String(hud.tiempo % 60).padStart(2, "0")}
               </div>
-              <div className="rounded-lg bg-black/60 px-3 py-2 font-mono text-[11px] backdrop-blur">
+              <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
                 <div>1 · Botiquín {hud.inventario.includes("botiquin") ? "✔" : "—"}</div>
                 <div>2 · Cola {hud.inventario.includes("cola") ? "✔" : "—"}</div>
               </div>
             </div>
 
-            <div className="pointer-events-none absolute bottom-4 left-4 space-y-1 font-mono text-[11px] text-muted-foreground">
+            <div className="pointer-events-none absolute bottom-2 left-2 max-w-[55%] space-y-1 font-mono text-[10px] text-muted-foreground sm:bottom-4 sm:left-4 sm:text-[11px]">
               {hud.mensajes.map((m, i) => (
-                <div key={i} className="rounded bg-black/50 px-2 py-1">
+                <div key={i} className="rounded bg-background/75 px-2 py-1">
                   {m}
                 </div>
               ))}
             </div>
 
             {hud.estado !== "jugando" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-xl bg-black/80">
-                <h2 className="text-4xl font-black">
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
+                <h2 className="text-3xl font-black sm:text-4xl">
                   {hud.estado === "ganado" ? "¡Sobreviviste!" : "Te atraparon"}
                 </h2>
-                <button
+                <Button
                   onClick={() => setFase("menu")}
-                  className="rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                  size="lg"
                 >
                   Volver al menú
-                </button>
+                </Button>
               </div>
             )}
           </>
         )}
 
-        <button
+        <Button
           onClick={() => setAjustes((v) => !v)}
-          className="absolute bottom-4 right-4 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs font-semibold backdrop-blur"
+          variant="outline"
+          size="sm"
+          className="absolute bottom-2 right-2 z-20 bg-card/90 backdrop-blur sm:bottom-4 sm:right-4"
         >
           Ajustes
-        </button>
+        </Button>
         {ajustes && (
           <div className="absolute bottom-16 right-4 w-64 rounded-xl border border-border bg-card p-4 shadow-xl">
             <h3 className="text-sm font-semibold">Ajustes</h3>
@@ -369,16 +424,74 @@ export function Game() {
                 className="accent-primary"
               />
             </label>
-            <button
+            <Button
               onClick={() => setFase("menu")}
-              className="mt-4 w-full rounded-lg border border-border px-3 py-2 text-xs hover:bg-accent"
+              variant="outline"
+              size="sm"
+              className="mt-4 w-full"
             >
               Abandonar partida
-            </button>
+            </Button>
           </div>
         )}
       </div>
-      <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+
+      {tactil && hud?.estado === "jugando" && (
+        <div className="touch-controls grid w-full max-w-[960px] grid-cols-[minmax(8rem,1fr)_minmax(10rem,1.25fr)] items-end gap-3 pt-3 sm:gap-6">
+          <div
+            role="application"
+            aria-label="Palanca de movimiento"
+            onPointerDown={iniciarPalanca}
+            onPointerMove={(ev) => ev.currentTarget.hasPointerCapture(ev.pointerId) && moverPalanca(ev)}
+            onPointerUp={soltarPalanca}
+            onPointerCancel={soltarPalanca}
+            className="relative size-32 touch-none rounded-full border border-border bg-card/80 shadow-lg landscape:size-28"
+          >
+            <div className="absolute inset-4 rounded-full border border-border/70" />
+            <div
+              className="absolute left-1/2 top-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-primary/60 bg-primary/25 shadow-md"
+              style={{ transform: `translate(calc(-50% + ${palanca.x * 36}px), calc(-50% + ${palanca.y * 36}px))` }}
+            >
+              <span className="sr-only">Mover</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 justify-self-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Usar botiquín"
+              disabled={!hud.inventario.includes("botiquin")}
+              onPointerDown={() => pulsar("recoger", "botiquin")}
+              className="size-12 touch-none"
+            ><ShieldPlus /></Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Usar cola"
+              disabled={!hud.inventario.includes("cola")}
+              onPointerDown={() => pulsar("recoger", "cola")}
+              className="size-12 touch-none"
+            ><Zap /></Button>
+            <Button type="button" variant="outline" size="icon" aria-label="Recoger objeto" onPointerDown={() => pulsar("recoger")} className="size-12 touch-none"><PackageOpen /></Button>
+            <Button type="button" variant="outline" size="icon" aria-label="Cancelar acción" onPointerDown={() => pulsar("cancelar")} className="size-12 touch-none"><X /></Button>
+            <Button
+              type="button"
+              variant="secondary"
+              aria-label="Correr"
+              onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touchRun.current = true; }}
+              onPointerUp={() => { touchRun.current = false; }}
+              onPointerCancel={() => { touchRun.current = false; }}
+              className="col-span-2 h-12 touch-none"
+            >Correr</Button>
+            <Button type="button" aria-label="Usar habilidad" onPointerDown={() => pulsar("habilidad")} className="col-span-2 h-12 touch-none"><Hand /> Habilidad</Button>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 hidden font-mono text-[11px] text-muted-foreground sm:block">
         WASD mover · Shift correr · Espacio habilidad · E recoger · 1/2 usar objeto · Esc cancelar
       </p>
     </main>
