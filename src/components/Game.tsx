@@ -175,6 +175,44 @@ export function Game() {
             ))}
           </div>
 
+          <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            Composición de la partida
+          </h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-semibold">Sobrevivientes</span>
+                <span className="font-mono text-primary">{nSobrevivientes}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                value={nSobrevivientes}
+                onChange={(e) => setNSobrevivientes(Number(e.target.value))}
+                className="mt-3 w-full accent-primary"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">Tú incluido (1 a 20).</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-semibold">Asesinos</span>
+                <span className="font-mono text-destructive">{nAsesinos}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                value={nAsesinos}
+                onChange={(e) => setNAsesinos(Number(e.target.value))}
+                className="mt-3 w-full accent-primary"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Se coordinan: uno persigue y el resto flanquea (1 a 20).
+              </p>
+            </div>
+          </div>
+
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <button
               onClick={() => iniciar(habilidad)}
