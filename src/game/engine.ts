@@ -1,5 +1,7 @@
 // Motor del juego de supervivencia: asesinos vs sobrevivientes.
-// Todo el estado vive en un objeto plano que se actualiza con step(dt).
+// Incluye navegación con A*, coordinación por equipos y estados de efecto.
+
+import { buscarCamino, construirGrid, lineaLibre, type Grid } from "./pathfind";
 
 export type SurvivorAbility = "medico" | "atacante" | "asustadizo" | "mago";
 export type KillerAbility = "venenoso" | "ninja";
@@ -11,6 +13,7 @@ export const SURVIVOR_ABILITIES: SurvivorAbility[] = [
   "asustadizo",
   "mago",
 ];
+export const KILLER_ABILITIES: KillerAbility[] = ["venenoso", "ninja"];
 
 export const ABILITY_INFO: Record<
   SurvivorAbility | KillerAbility,
@@ -59,16 +62,17 @@ export const ITEM_INFO: Record<
 export const MAGO_COOLDOWN_BASE = 15;
 export const MAGO_PENALIZACION_CANCELAR = 10;
 
-// Velocidades base (px/s)
 const SURV_WALK = 118;
 const SURV_RUN = 190;
 const KILL_WALK = 126;
-const KILL_RUN = SURV_RUN * 0.85; // los asesinos corren más lento que los sobrevivientes
+const KILL_RUN = SURV_RUN * 0.85;
 
 export const WORLD_W = 1600;
 export const WORLD_H = 1100;
 
 export type Rect = { x: number; y: number; w: number; h: number };
+
+export type Rol = "cazar" | "flanquear" | "patrullar" | "huir" | "apoyar" | "rescatar" | "buscar";
 
 export type Entity = {
   id: number;
@@ -80,7 +84,7 @@ export type Entity = {
   r: number;
   hp: number;
   maxHp: number;
-  fx: number; // facing
+  fx: number;
   fy: number;
   isPlayer: boolean;
   cooldownHasta: number;
@@ -91,12 +95,18 @@ export type Entity = {
   veneno: { hasta: number; sig: number } | null;
   escudo: { hp: number; hasta: number } | null;
   canalizando: { tipo: ItemKind; fin: number; total: number } | null;
-  escudoActivoSobre: number | null; // solo mago
+  escudoActivoSobre: number | null;
   inventario: Partial<Record<ItemKind, boolean>>;
-  ataqueListo: number; // solo asesinos (golpe cuerpo a cuerpo)
+  ataqueListo: number;
   vivo: boolean;
-  iaObjetivo: { x: number; y: number } | null;
-  iaSig: number;
+  venenoArmadoHasta: number;
+  // navegación / IA
+  camino: { x: number; y: number }[];
+  caminoIdx: number;
+  repathEn: number;
+  meta: { x: number; y: number } | null;
+  rol: Rol;
+  objetivoId: number | null;
 };
 
 export type Knife = { x: number; y: number; vx: number; vy: number; owner: number; vivo: boolean };
@@ -105,10 +115,22 @@ export type Swing = { x: number; y: number; fx: number; fy: number; hasta: numbe
 export type Bubble = { x: number; y: number; vy: number; vida: number };
 export type Pickup = { id: number; x: number; y: number; kind: ItemKind; tomado: boolean };
 
+export type Coord = {
+  // conocimiento compartido de los asesinos
+  presa: number | null;
+  presaX: number;
+  presaY: number;
+  presaVistaEn: number;
+  // conocimiento compartido de los sobrevivientes
+  avisos: { x: number; y: number; hasta: number; killerId: number }[];
+  socorroId: number | null;
+};
+
 export type GameState = {
   t: number;
   estado: "jugando" | "ganado" | "perdido";
   walls: Rect[];
+  grid: Grid;
   entities: Entity[];
   knives: Knife[];
   puddles: Puddle[];
@@ -117,6 +139,7 @@ export type GameState = {
   pickups: Pickup[];
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
+  coord: Coord;
 };
 
 export type Input = {
@@ -134,7 +157,7 @@ export type Input = {
 let nextId = 1;
 
 function walls(): Rect[] {
-  const w: Rect[] = [
+  return [
     { x: 0, y: 0, w: WORLD_W, h: 24 },
     { x: 0, y: WORLD_H - 24, w: WORLD_W, h: 24 },
     { x: 0, y: 0, w: 24, h: WORLD_H },
@@ -151,7 +174,6 @@ function walls(): Rect[] {
     { x: 400, y: 860, w: 380, h: 28 },
     { x: 1360, y: 700, w: 28, h: 240 },
   ];
-  return w;
 }
 
 function nuevaEntidad(
@@ -187,56 +209,18 @@ function nuevaEntidad(
     inventario: {},
     ataqueListo: 0,
     vivo: true,
-    iaObjetivo: null,
-    iaSig: 0,
+    venenoArmadoHasta: 0,
+    camino: [],
+    caminoIdx: 0,
+    repathEn: 0,
+    meta: null,
+    rol: team === "killer" ? "patrullar" : "buscar",
+    objetivoId: null,
   };
 }
 
-export function crearJuego(habilidadJugador: SurvivorAbility): GameState {
-  nextId = 1;
-  const ents: Entity[] = [];
-  ents.push(nuevaEntidad("Tú", "survivor", habilidadJugador, 120, 980, true));
-
-  const otras = SURVIVOR_ABILITIES.filter((a) => a !== habilidadJugador);
-  const puntos = [
-    { x: 160, y: 120 },
-    { x: 1420, y: 180 },
-    { x: 1440, y: 980 },
-  ];
-  otras.forEach((a, i) => {
-    const p = puntos[i]!;
-    ents.push(nuevaEntidad(ABILITY_INFO[a].nombre, "survivor", a, p.x, p.y));
-  });
-
-  ents.push(nuevaEntidad("Venenoso", "killer", "venenoso", 760, 560));
-  ents.push(nuevaEntidad("Ninja", "killer", "ninja", 980, 180));
-
-  const pickups: Pickup[] = [
-    { id: nextId++, x: 340, y: 300, kind: "botiquin", tomado: false },
-    { id: nextId++, x: 1120, y: 420, kind: "botiquin", tomado: false },
-    { id: nextId++, x: 560, y: 760, kind: "botiquin", tomado: false },
-    { id: nextId++, x: 300, y: 640, kind: "cola", tomado: false },
-    { id: nextId++, x: 1300, y: 840, kind: "cola", tomado: false },
-    { id: nextId++, x: 980, y: 120, kind: "cola", tomado: false },
-  ];
-
-  return {
-    t: 0,
-    estado: "jugando",
-    walls: walls(),
-    entities: ents,
-    knives: [],
-    puddles: [],
-    swings: [],
-    bubbles: [],
-    pickups,
-    mensajes: [],
-    tiempoRestante: 180,
-  };
-}
-
-function colisiona(x: number, y: number, r: number, walls: Rect[]): boolean {
-  for (const w of walls) {
+function colisiona(x: number, y: number, r: number, ws: Rect[]): boolean {
+  for (const w of ws) {
     const cx = Math.max(w.x, Math.min(x, w.x + w.w));
     const cy = Math.max(w.y, Math.min(y, w.y + w.h));
     const dx = x - cx;
@@ -244,6 +228,93 @@ function colisiona(x: number, y: number, r: number, walls: Rect[]): boolean {
     if (dx * dx + dy * dy < r * r) return true;
   }
   return false;
+}
+
+function puntoLibre(ws: Rect[], x: number, y: number) {
+  return !colisiona(x, y, 22, ws);
+}
+
+function spawnCerca(ws: Rect[], cx: number, cy: number, usados: { x: number; y: number }[]) {
+  for (let i = 0; i < 400; i++) {
+    const rad = 40 + i * 3;
+    const a = Math.random() * Math.PI * 2;
+    const x = Math.max(50, Math.min(WORLD_W - 50, cx + Math.cos(a) * rad));
+    const y = Math.max(50, Math.min(WORLD_H - 50, cy + Math.sin(a) * rad));
+    if (!puntoLibre(ws, x, y)) continue;
+    if (usados.some((u) => Math.hypot(u.x - x, u.y - y) < 44)) continue;
+    usados.push({ x, y });
+    return { x, y };
+  }
+  return { x: cx, y: cy };
+}
+
+export type Config = {
+  habilidad: SurvivorAbility;
+  sobrevivientes: number; // 1..20 (incluye al jugador)
+  asesinos: number; // 1..20
+  duracion: number;
+};
+
+export function crearJuego(cfg: Config): GameState {
+  nextId = 1;
+  const ws = walls();
+  const grid = construirGrid(ws, WORLD_W, WORLD_H);
+  const ents: Entity[] = [];
+  const usados: { x: number; y: number }[] = [];
+
+  const spawnSurv = spawnCerca(ws, 140, 960, usados);
+  ents.push(nuevaEntidad("Tú", "survivor", cfg.habilidad, spawnSurv.x, spawnSurv.y, true));
+
+  const esquinas = [
+    { x: 160, y: 140 },
+    { x: 1420, y: 180 },
+    { x: 1440, y: 960 },
+    { x: 160, y: 960 },
+  ];
+  for (let i = 0; i < Math.max(0, cfg.sobrevivientes - 1); i++) {
+    const a = SURVIVOR_ABILITIES[i % SURVIVOR_ABILITIES.length]!;
+    const base = esquinas[i % esquinas.length]!;
+    const p = spawnCerca(ws, base.x, base.y, usados);
+    ents.push(
+      nuevaEntidad(`${ABILITY_INFO[a].nombre} ${Math.floor(i / 4) + 1}`, "survivor", a, p.x, p.y),
+    );
+  }
+
+  for (let i = 0; i < cfg.asesinos; i++) {
+    const a = KILLER_ABILITIES[i % KILLER_ABILITIES.length]!;
+    const p = spawnCerca(ws, WORLD_W / 2, WORLD_H / 2, usados);
+    ents.push(
+      nuevaEntidad(`${ABILITY_INFO[a].nombre} ${Math.floor(i / 2) + 1}`, "killer", a, p.x, p.y),
+    );
+  }
+
+  const pickups: Pickup[] = [];
+  const totalItems = Math.max(6, Math.round(cfg.sobrevivientes * 1.5));
+  for (let i = 0; i < totalItems; i++) {
+    const p = spawnCerca(
+      ws,
+      120 + Math.random() * (WORLD_W - 240),
+      120 + Math.random() * (WORLD_H - 240),
+      usados,
+    );
+    pickups.push({ id: nextId++, x: p.x, y: p.y, kind: i % 2 === 0 ? "botiquin" : "cola", tomado: false });
+  }
+
+  return {
+    t: 0,
+    estado: "jugando",
+    walls: ws,
+    grid,
+    entities: ents,
+    knives: [],
+    puddles: [],
+    swings: [],
+    bubbles: [],
+    pickups,
+    mensajes: [],
+    tiempoRestante: cfg.duracion,
+    coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
+  };
 }
 
 function mover(e: Entity, dx: number, dy: number, st: GameState) {
@@ -257,17 +328,10 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (st.t < e.stunHasta) return 0;
   if (e.canalizando) return 0;
   const esSurv = e.team === "survivor";
-  let base = esSurv
-    ? corriendo
-      ? SURV_RUN
-      : SURV_WALK
-    : corriendo
-      ? KILL_RUN
-      : KILL_WALK;
-  // El mago se ralentiza y no puede correr mientras mantiene el escudo
+  let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
   if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
-  if (e.boost && st.t < e.boost.hasta) base *= e.boost.mult;
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
+  if (conBoost) base *= e.boost!.mult;
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
   return base;
 }
@@ -298,9 +362,7 @@ function danar(st: GameState, e: Entity, cantidad: number) {
 
 function liberarEscudo(st: GameState, objetivo: Entity) {
   objetivo.escudo = null;
-  for (const m of st.entities) {
-    if (m.escudoActivoSobre === objetivo.id) m.escudoActivoSobre = null;
-  }
+  for (const m of st.entities) if (m.escudoActivoSobre === objetivo.id) m.escudoActivoSobre = null;
 }
 
 export function cancelarEscudoMago(st: GameState, mago: Entity) {
@@ -325,13 +387,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
   switch (e.ability) {
     case "medico": {
       const curacion = e.hp > 40 ? 6 : 3;
-      st.puddles.push({
-        x: e.x + e.fx * 46,
-        y: e.y + e.fy * 46,
-        r: 52,
-        hasta: st.t + 3,
-        curacion,
-      });
+      st.puddles.push({ x: e.x + e.fx * 46, y: e.y + e.fy * 46, r: 52, hasta: st.t + 3, curacion });
       break;
     }
     case "atacante": {
@@ -340,8 +396,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
       const cy = e.y + e.fy * 44;
       for (const o of st.entities) {
         if (o.team !== "killer" || !o.vivo) continue;
-        const d = Math.hypot(o.x - cx, o.y - cy);
-        if (d < 46 + o.r) {
+        if (Math.hypot(o.x - cx, o.y - cy) < 46 + o.r) {
           o.stunHasta = st.t + 5;
           msg(st, `${o.nombre} aturdido 5 s`);
         }
@@ -351,7 +406,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
     }
     case "asustadizo": {
       e.boost = { mult: 3, hasta: st.t + 10 };
-      e.slowHasta = st.t + 14; // se aplica al terminar el boost, dura 4 s
+      e.slowHasta = st.t + 14;
       break;
     }
     case "mago": {
@@ -387,9 +442,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
       break;
     }
     case "venenoso": {
-      // el veneno es pasivo durante 8 s: sus golpes envenenan
-      e.boost = e.boost;
-      (e as Entity & { venenoArmadoHasta?: number }).venenoArmadoHasta = st.t + 8;
+      e.venenoArmadoHasta = st.t + 8;
       for (let i = 0; i < 14; i++) {
         st.bubbles.push({
           x: e.x + (Math.random() - 0.5) * 30,
@@ -434,12 +487,12 @@ export function intentarRecoger(st: GameState, e: Entity) {
     if (p.tomado) continue;
     if (Math.hypot(p.x - e.x, p.y - e.y) < 34) {
       if (e.inventario[p.kind]) {
-        msg(st, `Ya llevas un ${ITEM_INFO[p.kind].nombre.toLowerCase()}`);
+        if (e.isPlayer) msg(st, `Ya llevas un ${ITEM_INFO[p.kind].nombre.toLowerCase()}`);
         return;
       }
       e.inventario[p.kind] = true;
       p.tomado = true;
-      msg(st, `${ITEM_INFO[p.kind].nombre} recogido`);
+      if (e.isPlayer) msg(st, `${ITEM_INFO[p.kind].nombre} recogido`);
       return;
     }
   }
@@ -447,79 +500,302 @@ export function intentarRecoger(st: GameState, e: Entity) {
 
 function golpeAsesino(st: GameState, k: Entity, objetivo: Entity) {
   danar(st, objetivo, 20);
-  const armado = (k as Entity & { venenoArmadoHasta?: number }).venenoArmadoHasta ?? 0;
-  if (k.ability === "venenoso" && st.t < armado) {
+  if (k.ability === "venenoso" && st.t < k.venenoArmadoHasta) {
     objetivo.veneno = { hasta: st.t + 6, sig: st.t + 1 };
   }
   k.ataqueListo = st.t + 1.6;
 }
 
-function ia(st: GameState, e: Entity, dt: number) {
-  if (st.t < e.stunHasta || e.canalizando) return;
-  const vivos = st.entities.filter((o) => o.vivo);
-  if (e.team === "killer") {
-    let objetivo: Entity | null = null;
+// ---------------------------------------------------------------- navegación
+
+function fijarMeta(st: GameState, e: Entity, x: number, y: number, urgente = false) {
+  const cambio = !e.meta || Math.hypot(e.meta.x - x, e.meta.y - y) > 70;
+  if (cambio || st.t >= e.repathEn || e.caminoIdx >= e.camino.length) {
+    e.meta = { x, y };
+    e.camino = buscarCamino(st.grid, e.x, e.y, x, y);
+    e.caminoIdx = 0;
+    e.repathEn = st.t + (urgente ? 0.35 : 0.8) + Math.random() * 0.25;
+  }
+}
+
+/** Avanza por el camino. Devuelve el ángulo de movimiento o null. */
+function seguirCamino(st: GameState, e: Entity, dt: number, corriendo: boolean): number | null {
+  if (e.caminoIdx >= e.camino.length) return null;
+  let nodo = e.camino[e.caminoIdx]!;
+  while (Math.hypot(nodo.x - e.x, nodo.y - e.y) < 18) {
+    e.caminoIdx++;
+    if (e.caminoIdx >= e.camino.length) return null;
+    nodo = e.camino[e.caminoIdx]!;
+  }
+  const ang = Math.atan2(nodo.y - e.y, nodo.x - e.x);
+  // separación suave de compañeros para que no se amontonen
+  let sx = 0;
+  let sy = 0;
+  for (const o of st.entities) {
+    if (o === e || !o.vivo || o.team !== e.team) continue;
+    const d = Math.hypot(o.x - e.x, o.y - e.y);
+    if (d > 0.1 && d < 38) {
+      sx += (e.x - o.x) / d;
+      sy += (e.y - o.y) / d;
+    }
+  }
+  const v = velocidad(e, st, corriendo) * dt;
+  const dx = Math.cos(ang) + sx * 0.45;
+  const dy = Math.sin(ang) + sy * 0.45;
+  const l = Math.hypot(dx, dy) || 1;
+  mover(e, (dx / l) * v, (dy / l) * v, st);
+  e.fx = Math.cos(ang);
+  e.fy = Math.sin(ang);
+  return ang;
+}
+
+function ve(st: GameState, a: Entity, b: Entity, rango = 520) {
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  return d < rango && lineaLibre(st.grid, a.x, a.y, b.x, b.y);
+}
+
+function puntoSeguro(st: GameState, e: Entity, killers: Entity[]) {
+  let mejor: { x: number; y: number } | null = null;
+  let mejorScore = -Infinity;
+  const aliados = st.entities.filter((o) => o.team === "survivor" && o.vivo && o !== e);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + Math.random();
+    const rad = 220 + Math.random() * 300;
+    const x = Math.max(60, Math.min(WORLD_W - 60, e.x + Math.cos(a) * rad));
+    const y = Math.max(60, Math.min(WORLD_H - 60, e.y + Math.sin(a) * rad));
+    if (colisiona(x, y, 20, st.walls)) continue;
+    let score = 0;
+    for (const k of killers) score += Math.min(600, Math.hypot(k.x - x, k.y - y));
+    for (const al of aliados) score += Math.max(0, 220 - Math.hypot(al.x - x, al.y - y)) * 0.4;
+    // los objetos también atraen
+    for (const p of st.pickups) {
+      if (!p.tomado && !e.inventario[p.kind]) {
+        score += Math.max(0, 200 - Math.hypot(p.x - x, p.y - y)) * 0.5;
+      }
+    }
+    if (score > mejorScore) {
+      mejorScore = score;
+      mejor = { x, y };
+    }
+  }
+  return mejor;
+}
+
+// --------------------------------------------------------------- IA equipos
+
+function actualizarCoordinacion(st: GameState) {
+  const killers = st.entities.filter((e) => e.team === "killer" && e.vivo);
+  const survs = st.entities.filter((e) => e.team === "survivor" && e.vivo);
+
+  // Asesinos: comparten la presa vista más "rentable" (cercana + herida)
+  let mejor: { e: Entity; score: number } | null = null;
+  for (const k of killers) {
+    for (const s of survs) {
+      if (!ve(st, k, s)) continue;
+      const score = 1000 - Math.hypot(k.x - s.x, k.y - s.y) + (100 - s.hp) * 3;
+      if (!mejor || score > mejor.score) mejor = { e: s, score };
+    }
+  }
+  if (mejor) {
+    st.coord.presa = mejor.e.id;
+    st.coord.presaX = mejor.e.x;
+    st.coord.presaY = mejor.e.y;
+    st.coord.presaVistaEn = st.t;
+  } else if (st.t - st.coord.presaVistaEn > 8) {
+    st.coord.presa = null;
+  }
+
+  // Sobrevivientes: avisos de asesinos avistados (memoria compartida 6 s)
+  for (const s of survs) {
+    for (const k of killers) {
+      if (ve(st, s, k, 460)) {
+        const prev = st.coord.avisos.find((a) => a.killerId === k.id);
+        if (prev) {
+          prev.x = k.x;
+          prev.y = k.y;
+          prev.hasta = st.t + 6;
+        } else st.coord.avisos.push({ x: k.x, y: k.y, hasta: st.t + 6, killerId: k.id });
+      }
+    }
+  }
+  st.coord.avisos = st.coord.avisos.filter((a) => st.t < a.hasta);
+
+  // ¿Quién necesita rescate? el sobreviviente con un asesino encima
+  let socorro: Entity | null = null;
+  let peor = Infinity;
+  for (const s of survs) {
+    for (const k of killers) {
+      const d = Math.hypot(k.x - s.x, k.y - s.y);
+      if (d < 200 && s.hp < peor) {
+        peor = s.hp;
+        socorro = s;
+      }
+    }
+  }
+  st.coord.socorroId = socorro ? socorro.id : null;
+}
+
+function iaAsesino(st: GameState, e: Entity, dt: number) {
+  const survs = st.entities.filter((o) => o.team === "survivor" && o.vivo);
+  if (!survs.length) return;
+  const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
+  const indice = killers.indexOf(e);
+
+  // objetivo: presa compartida, si no el más cercano visible, si no patrulla
+  let objetivo = survs.find((s) => s.id === st.coord.presa) ?? null;
+  let conocido = objetivo ? { x: st.coord.presaX, y: st.coord.presaY } : null;
+  const visible = objetivo && ve(st, e, objetivo);
+  if (visible) conocido = { x: objetivo!.x, y: objetivo!.y };
+  if (!objetivo) {
     let mejor = Infinity;
-    for (const s of vivos) {
-      if (s.team !== "survivor") continue;
+    for (const s of survs) {
       const d = Math.hypot(s.x - e.x, s.y - e.y);
-      if (d < mejor) {
+      if (d < mejor && ve(st, e, s)) {
         mejor = d;
         objetivo = s;
+        conocido = { x: s.x, y: s.y };
       }
     }
-    if (!objetivo) return;
-    const ang = Math.atan2(objetivo.y - e.y, objetivo.x - e.x);
-    e.fx = Math.cos(ang);
-    e.fy = Math.sin(ang);
-    const corriendo = mejor > 120;
-    const v = velocidad(e, st, corriendo) * dt;
-    if (mejor > e.r + objetivo.r + 2) mover(e, Math.cos(ang) * v, Math.sin(ang) * v, st);
-    if (mejor < e.r + objetivo.r + 8 && st.t > e.ataqueListo) golpeAsesino(st, e, objetivo);
-    if (st.t >= e.cooldownHasta) {
-      if (e.ability === "ninja" && mejor < 420 && mejor > 70) usarHabilidad(st, e);
-      if (e.ability === "venenoso" && mejor < 200) usarHabilidad(st, e);
+  }
+
+  if (objetivo && conocido) {
+    const d = Math.hypot(objetivo.x - e.x, objetivo.y - e.y);
+    // El asesino más cercano persigue; los demás flanquean cortando la huida
+    const distancias = killers
+      .map((k) => ({ k, d: Math.hypot(objetivo!.x - k.x, objetivo!.y - k.y) }))
+      .sort((a, b) => a.d - b.d);
+    const puesto = distancias.findIndex((x) => x.k === e);
+    if (puesto <= 0) {
+      e.rol = "cazar";
+      fijarMeta(st, e, conocido.x, conocido.y, true);
+    } else {
+      e.rol = "flanquear";
+      const ang = Math.atan2(objetivo.y - e.y, objetivo.x - e.x) + (puesto % 2 ? 1 : -1) * (0.9 + puesto * 0.25);
+      const rad = 170;
+      let fx = objetivo.x + Math.cos(ang) * rad;
+      let fy = objetivo.y + Math.sin(ang) * rad;
+      fx = Math.max(50, Math.min(WORLD_W - 50, fx));
+      fy = Math.max(50, Math.min(WORLD_H - 50, fy));
+      fijarMeta(st, e, fx, fy, true);
+    }
+    e.objetivoId = objetivo.id;
+    seguirCamino(st, e, dt, d > 110);
+    if (d < e.r + objetivo.r + 10 && st.t > e.ataqueListo) golpeAsesino(st, e, objetivo);
+    if (st.t >= e.cooldownHasta && visible) {
+      if (e.ability === "ninja" && d < 420 && d > 60) {
+        e.fx = (objetivo.x - e.x) / d;
+        e.fy = (objetivo.y - e.y) / d;
+        usarHabilidad(st, e);
+      }
+      if (e.ability === "venenoso" && d < 220) usarHabilidad(st, e);
     }
   } else {
-    // sobrevivientes bot: huyen del asesino más cercano y usan su habilidad
-    let amenaza: Entity | null = null;
+    e.rol = "patrullar";
+    e.objetivoId = null;
+    // patrulla repartida: cada asesino barre un sector distinto del mapa
+    if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60 || st.t > e.repathEn + 6) {
+      const sectores = Math.max(1, killers.length);
+      const s = (indice + Math.floor(st.t / 12)) % sectores;
+      const cx = 150 + ((s + 0.5) / sectores) * (WORLD_W - 300);
+      const cy = 150 + Math.random() * (WORLD_H - 300);
+      fijarMeta(st, e, cx, cy);
+    }
+    seguirCamino(st, e, dt, false);
+  }
+}
+
+function iaSobreviviente(st: GameState, e: Entity, dt: number) {
+  const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
+  const aliados = st.entities.filter((o) => o.team === "survivor" && o.vivo && o !== e);
+
+  // amenaza: asesino visible o avisado por el equipo
+  let amenaza: { x: number; y: number; d: number; ent: Entity | null } | null = null;
+  for (const k of killers) {
+    const d = Math.hypot(k.x - e.x, k.y - e.y);
+    if (ve(st, e, k, 480) && (!amenaza || d < amenaza.d)) amenaza = { x: k.x, y: k.y, d, ent: k };
+  }
+  if (!amenaza) {
+    for (const a of st.coord.avisos) {
+      const d = Math.hypot(a.x - e.x, a.y - e.y);
+      if (d < 340 && (!amenaza || d < amenaza.d)) amenaza = { x: a.x, y: a.y, d, ent: null };
+    }
+  }
+
+  const socorro = aliados.find((a) => a.id === st.coord.socorroId) ?? null;
+  const peligro = !!amenaza && amenaza.d < 330;
+
+  // ---- habilidades coordinadas
+  if (st.t >= e.cooldownHasta) {
+    if (e.ability === "atacante") {
+      const k = killers.find((kk) => Math.hypot(kk.x - e.x, kk.y - e.y) < 62);
+      if (k) {
+        const d = Math.hypot(k.x - e.x, k.y - e.y) || 1;
+        e.fx = (k.x - e.x) / d;
+        e.fy = (k.y - e.y) / d;
+        usarHabilidad(st, e);
+      }
+    } else if (e.ability === "mago") {
+      const aliadoEnPeligro = socorro && Math.hypot(socorro.x - e.x, socorro.y - e.y) < 240;
+      if (aliadoEnPeligro || (peligro && amenaza!.d < 180)) usarHabilidad(st, e);
+    } else if (e.ability === "asustadizo") {
+      if (peligro && amenaza!.d < 210) usarHabilidad(st, e);
+    } else if (e.ability === "medico") {
+      const herido = [e, ...aliados].find((a) => a.hp < 70 && Math.hypot(a.x - e.x, a.y - e.y) < 90);
+      if (herido) usarHabilidad(st, e);
+    }
+  }
+  // objetos: se usan a cubierto
+  if (!peligro && !e.canalizando) {
+    if (e.inventario.botiquin && e.hp < 65) iniciarItem(st, e, "botiquin");
+    else if (e.inventario.cola && !e.boost) iniciarItem(st, e, "cola");
+  }
+  if (e.canalizando && peligro) cancelarCanal(e);
+
+  // ---- decisión de destino
+  let corriendo = false;
+  if (peligro) {
+    e.rol = "huir";
+    const seguro = puntoSeguro(st, e, killers);
+    if (seguro) fijarMeta(st, e, seguro.x, seguro.y, true);
+    corriendo = puedeCorrer(e);
+  } else if (
+    socorro &&
+    (e.ability === "atacante" || e.ability === "medico" || e.ability === "mago") &&
+    Math.hypot(socorro.x - e.x, socorro.y - e.y) < 650
+  ) {
+    e.rol = e.ability === "atacante" ? "rescatar" : "apoyar";
+    fijarMeta(st, e, socorro.x, socorro.y, true);
+    corriendo = puedeCorrer(e);
+  } else {
+    // buscar objetos que le falten, si no agruparse con el compañero más cercano
+    let meta: { x: number; y: number } | null = null;
     let mejor = Infinity;
-    for (const k of vivos) {
-      if (k.team !== "killer") continue;
-      const d = Math.hypot(k.x - e.x, k.y - e.y);
+    for (const p of st.pickups) {
+      if (p.tomado || e.inventario[p.kind]) continue;
+      if (p.kind === "botiquin" && e.hp > 85 && e.inventario.cola) continue;
+      const d = Math.hypot(p.x - e.x, p.y - e.y);
       if (d < mejor) {
         mejor = d;
-        amenaza = k;
+        meta = { x: p.x, y: p.y };
       }
     }
-    let ang: number;
-    if (amenaza && mejor < 320) {
-      ang = Math.atan2(e.y - amenaza.y, e.x - amenaza.x);
-      if (st.t >= e.cooldownHasta) {
-        if (e.ability === "atacante" && mejor < 70) {
-          e.fx = -Math.cos(ang);
-          e.fy = -Math.sin(ang);
-          usarHabilidad(st, e);
-        } else if (e.ability === "asustadizo" && mejor < 200) usarHabilidad(st, e);
-        else if (e.ability === "mago" && mejor < 260) usarHabilidad(st, e);
-        else if (e.ability === "medico" && e.hp < 90) usarHabilidad(st, e);
-      }
+    if (meta) {
+      e.rol = "buscar";
+      fijarMeta(st, e, meta.x, meta.y);
     } else {
-      if (!e.iaObjetivo || st.t > e.iaSig) {
-        e.iaObjetivo = {
-          x: 80 + Math.random() * (WORLD_W - 160),
-          y: 80 + Math.random() * (WORLD_H - 160),
-        };
-        e.iaSig = st.t + 4;
+      e.rol = "apoyar";
+      const comp = aliados.sort(
+        (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
+      )[0];
+      if (comp && Math.hypot(comp.x - e.x, comp.y - e.y) > 120) fijarMeta(st, e, comp.x, comp.y);
+      else if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60) {
+        fijarMeta(st, e, 80 + Math.random() * (WORLD_W - 160), 80 + Math.random() * (WORLD_H - 160));
       }
-      ang = Math.atan2(e.iaObjetivo.y - e.y, e.iaObjetivo.x - e.x);
-      if (e.ability === "medico" && e.hp < 70 && st.t >= e.cooldownHasta) usarHabilidad(st, e);
     }
-    e.fx = Math.cos(ang);
-    e.fy = Math.sin(ang);
-    const v = velocidad(e, st, puedeCorrer(e) && mejor < 320) * dt;
-    mover(e, Math.cos(ang) * v, Math.sin(ang) * v, st);
   }
+
+  seguirCamino(st, e, dt, corriendo);
+  intentarRecoger(st, e);
 }
 
 export function step(st: GameState, dt: number, input: Input) {
@@ -529,7 +805,6 @@ export function step(st: GameState, dt: number, input: Input) {
 
   const jugador = st.entities.find((e) => e.isPlayer)!;
 
-  // --- jugador ---
   if (jugador.vivo) {
     let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
@@ -557,14 +832,18 @@ export function step(st: GameState, dt: number, input: Input) {
     if (jugador.canalizando && st.t >= jugador.canalizando.fin) terminarCanal(st, jugador);
   }
 
-  // --- IA ---
+  actualizarCoordinacion(st);
+
   for (const e of st.entities) {
     if (!e.vivo || e.isPlayer) continue;
-    ia(st, e, dt);
-    if (e.canalizando && st.t >= e.canalizando.fin) terminarCanal(st, e);
+    if (st.t < e.stunHasta || e.canalizando) {
+      if (e.canalizando && st.t >= e.canalizando.fin) terminarCanal(st, e);
+      continue;
+    }
+    if (e.team === "killer") iaAsesino(st, e, dt);
+    else iaSobreviviente(st, e, dt);
   }
 
-  // --- efectos por entidad ---
   for (const e of st.entities) {
     if (!e.vivo) continue;
     if (e.veneno) {
@@ -576,16 +855,15 @@ export function step(st: GameState, dt: number, input: Input) {
     }
     if (e.escudo && st.t >= e.escudo.hasta) liberarEscudo(st, e);
     if (e.boost && st.t >= e.boost.hasta) e.boost = null;
-    // charcos curativos
-    for (const p of st.puddles) {
-      if (e.team !== "survivor") continue;
-      if (Math.hypot(p.x - e.x, p.y - e.y) < p.r + e.r) {
-        e.hp = Math.min(e.maxHp, e.hp + p.curacion * dt);
+    if (e.team === "survivor") {
+      for (const p of st.puddles) {
+        if (Math.hypot(p.x - e.x, p.y - e.y) < p.r + e.r) {
+          e.hp = Math.min(e.maxHp, e.hp + p.curacion * dt);
+        }
       }
     }
   }
 
-  // --- cuchillos ---
   for (const k of st.knives) {
     if (!k.vivo) continue;
     k.x += k.vx * dt;
@@ -605,15 +883,13 @@ export function step(st: GameState, dt: number, input: Input) {
   }
   st.knives = st.knives.filter((k) => k.vivo);
 
-  // --- burbujas de veneno ---
   for (const b of st.bubbles) {
     b.y += b.vy * dt;
     b.vida -= dt;
   }
   st.bubbles = st.bubbles.filter((b) => b.vida > 0);
   for (const k of st.entities) {
-    const armado = (k as Entity & { venenoArmadoHasta?: number }).venenoArmadoHasta ?? 0;
-    if (k.ability === "venenoso" && k.vivo && st.t < armado && Math.random() < dt * 12) {
+    if (k.ability === "venenoso" && k.vivo && st.t < k.venenoArmadoHasta && Math.random() < dt * 12) {
       st.bubbles.push({
         x: k.x + (Math.random() - 0.5) * 26,
         y: k.y + (Math.random() - 0.5) * 26,
