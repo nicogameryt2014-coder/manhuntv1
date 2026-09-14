@@ -142,4 +142,47 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  body.game-active {
+    overscroll-behavior: none;
+  }
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  body.game-active {
+    height: 100dvh;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .game-screen {
+    min-height: 100dvh;
+    height: 100dvh;
+    justify-content: flex-start;
+  }
+
+  .game-stage {
+    flex: 0 1 auto;
+  }
+
+  .touch-controls {
+    flex: 1 0 9rem;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+  .game-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.55fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .touch-controls {
+    grid-template-columns: 7rem minmax(10rem, 1fr);
+    align-self: center;
+    padding-top: 0;
+  }
 }
