@@ -172,33 +172,89 @@ function indicadoresBorde(
   vh: number,
 ) {
   const margen = 26;
+  type Marca = {
+    e: Entity;
+    px: number;
+    py: number;
+    ang: number;
+    alpha: number;
+    esAsesino: boolean;
+    color: string;
+    R: number;
+    dist: number;
+  };
+  const marcas: Marca[] = [];
+
   for (const e of st.entities) {
     if (!e.vivo || e.isPlayer) continue;
     const sx = e.x - camX;
     const sy = e.y - camY;
-    const dentro = sx > -10 && sx < vw + 10 && sy > -10 && sy < vh + 10;
-    if (dentro) continue;
+    if (sx > -10 && sx < vw + 10 && sy > -10 && sy < vh + 10) continue;
 
     const cx = vw / 2;
     const cy = vh / 2;
     const ang = Math.atan2(sy - cy, sx - cx);
-    // intersección con el rectángulo de la pantalla
     const hw = vw / 2 - margen;
     const hh = vh / 2 - margen;
     const cos = Math.cos(ang);
     const sin = Math.sin(ang);
-    const t = Math.min(
-      Math.abs(hw / (cos || 1e-6)),
-      Math.abs(hh / (sin || 1e-6)),
-    );
-    const px = cx + cos * t;
-    const py = cy + sin * t;
-
+    const t = Math.min(Math.abs(hw / (cos || 1e-6)), Math.abs(hh / (sin || 1e-6)));
     const dist = Math.hypot(e.x - jugador.x, e.y - jugador.y);
-    const alpha = Math.max(0.32, Math.min(0.95, 1 - dist / 1700));
     const esAsesino = e.team === "killer";
-    const color = esAsesino ? "#e05b6b" : "#7fd1c0";
-    const R = esAsesino ? 12 : 10;
+    marcas.push({
+      e,
+      px: cx + cos * t,
+      py: cy + sin * t,
+      ang,
+      alpha: Math.max(0.32, Math.min(0.95, 1 - dist / 1700)),
+      esAsesino,
+      color: esAsesino ? "#e05b6b" : "#7fd1c0",
+      R: esAsesino ? 12 : 10,
+      dist,
+    });
+  }
+
+  // prioriza lo cercano y lo peligroso, y limita la cantidad para no tapar la pantalla
+  marcas.sort((a, b) => a.dist - b.dist - (a.esAsesino ? 250 : 0) + (b.esAsesino ? 250 : 0));
+  const visibles = marcas.slice(0, 12);
+
+  // separa las burbujas que se solapan, deslizándolas por el borde
+  for (let iter = 0; iter < 6; iter++) {
+    for (let i = 0; i < visibles.length; i++) {
+      for (let j = i + 1; j < visibles.length; j++) {
+        const a = visibles[i]!;
+        const b = visibles[j]!;
+        const dx = b.px - a.px;
+        const dy = b.py - a.py;
+        const d = Math.hypot(dx, dy) || 0.01;
+        const min = a.R + b.R + 8;
+        if (d < min) {
+          const emp = ((min - d) / 2) * 1.02;
+          a.px -= (dx / d) * emp;
+          a.py -= (dy / d) * emp;
+          b.px += (dx / d) * emp;
+          b.py += (dy / d) * emp;
+        }
+      }
+    }
+    for (const m of visibles) {
+      m.px = Math.max(margen, Math.min(vw - margen, m.px));
+      m.py = Math.max(margen, Math.min(vh - margen, m.py));
+      // vuelve a pegar la burbuja al borde más próximo
+      const dIzq = m.px - margen;
+      const dDer = vw - margen - m.px;
+      const dArr = m.py - margen;
+      const dAba = vh - margen - m.py;
+      const menor = Math.min(dIzq, dDer, dArr, dAba);
+      if (menor === dIzq) m.px = margen;
+      else if (menor === dDer) m.px = vw - margen;
+      else if (menor === dArr) m.py = margen;
+      else m.py = vh - margen;
+    }
+  }
+
+  for (const { e, px, py, ang, alpha, esAsesino, color, R } of visibles) {
+
 
     ctx.save();
     ctx.globalAlpha = alpha;
