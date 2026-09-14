@@ -33,6 +33,8 @@ const VH = 620;
 export function Game() {
   const [fase, setFase] = useState<Fase>("menu");
   const [habilidad, setHabilidad] = useState<SurvivorAbility>("medico");
+  const [nSobrevivientes, setNSobrevivientes] = useState(4);
+  const [nAsesinos, setNAsesinos] = useState(2);
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -48,11 +50,17 @@ export function Game() {
 
   const iniciar = useCallback(
     (a: SurvivorAbility) => {
-      stateRef.current = crearJuego(a);
+      stateRef.current = crearJuego({
+        habilidad: a,
+        sobrevivientes: nSobrevivientes,
+        asesinos: nAsesinos,
+        duracion: 180,
+      });
       setFase("jugando");
     },
-    [],
+    [nSobrevivientes, nAsesinos],
   );
+
 
   useEffect(() => {
     const down = (ev: KeyboardEvent) => {
