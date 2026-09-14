@@ -258,7 +258,7 @@ export type Config = {
 export function crearJuego(cfg: Config): GameState {
   nextId = 1;
   const ws = walls();
-  const grid = construirGrid(ws);
+  const grid = construirGrid(ws, WORLD_W, WORLD_H);
   const ents: Entity[] = [];
   const usados: { x: number; y: number }[] = [];
 
