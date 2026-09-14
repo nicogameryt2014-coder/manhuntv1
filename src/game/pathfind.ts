@@ -1,13 +1,17 @@
 // Malla de navegación + A* con suavizado de línea de visión.
-import { WORLD_W, WORLD_H, type Rect } from "./engine";
+// Sin imports del motor para evitar ciclos de módulos.
 
 export const CELL = 32;
-export const COLS = Math.floor(WORLD_W / CELL);
-export const ROWS = Math.floor(WORLD_H / CELL);
 
-export type Grid = { bloqueado: Uint8Array; coste: Float32Array };
+export type NavRect = { x: number; y: number; w: number; h: number };
+export type Grid = {
+  cols: number;
+  rows: number;
+  bloqueado: Uint8Array;
+  coste: Float32Array;
+};
 
-function rectColisiona(cx: number, cy: number, r: number, w: Rect) {
+function rectColisiona(cx: number, cy: number, r: number, w: NavRect) {
   const px = Math.max(w.x, Math.min(cx, w.x + w.w));
   const py = Math.max(w.y, Math.min(cy, w.y + w.h));
   const dx = cx - px;
@@ -15,11 +19,18 @@ function rectColisiona(cx: number, cy: number, r: number, w: Rect) {
   return dx * dx + dy * dy < r * r;
 }
 
-export function construirGrid(walls: Rect[], radio = 17): Grid {
-  const bloqueado = new Uint8Array(COLS * ROWS);
-  const coste = new Float32Array(COLS * ROWS).fill(1);
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
+export function construirGrid(
+  walls: NavRect[],
+  worldW: number,
+  worldH: number,
+  radio = 17,
+): Grid {
+  const cols = Math.floor(worldW / CELL);
+  const rows = Math.floor(worldH / CELL);
+  const bloqueado = new Uint8Array(cols * rows);
+  const coste = new Float32Array(cols * rows).fill(1);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
       const cx = x * CELL + CELL / 2;
       const cy = y * CELL + CELL / 2;
       let bloq = false;
@@ -29,50 +40,49 @@ export function construirGrid(walls: Rect[], radio = 17): Grid {
           break;
         }
       }
-      bloqueado[y * COLS + x] = bloq ? 1 : 0;
+      bloqueado[y * cols + x] = bloq ? 1 : 0;
     }
   }
-  // Penaliza celdas pegadas a una pared para que los caminos no rocen esquinas
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
-      if (bloqueado[y * COLS + x]) continue;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      if (bloqueado[y * cols + x]) continue;
       let vecinos = 0;
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = x + dx;
           const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-          if (bloqueado[ny * COLS + nx]) vecinos++;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          if (bloqueado[ny * cols + nx]) vecinos++;
         }
       }
-      coste[y * COLS + x] = 1 + vecinos * 0.6;
+      coste[y * cols + x] = 1 + vecinos * 0.6;
     }
   }
-  return { bloqueado, coste };
+  return { cols, rows, bloqueado, coste };
 }
 
 export function celdaLibre(g: Grid, x: number, y: number) {
   const cx = Math.floor(x / CELL);
   const cy = Math.floor(y / CELL);
-  if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) return false;
-  return !g.bloqueado[cy * COLS + cx];
+  if (cx < 0 || cy < 0 || cx >= g.cols || cy >= g.rows) return false;
+  return !g.bloqueado[cy * g.cols + cx];
 }
 
 function masCercanaLibre(g: Grid, x: number, y: number): number {
-  let cx = Math.max(0, Math.min(COLS - 1, Math.floor(x / CELL)));
-  let cy = Math.max(0, Math.min(ROWS - 1, Math.floor(y / CELL)));
-  if (!g.bloqueado[cy * COLS + cx]) return cy * COLS + cx;
+  const cx = Math.max(0, Math.min(g.cols - 1, Math.floor(x / CELL)));
+  const cy = Math.max(0, Math.min(g.rows - 1, Math.floor(y / CELL)));
+  if (!g.bloqueado[cy * g.cols + cx]) return cy * g.cols + cx;
   for (let r = 1; r < 12; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         const nx = cx + dx;
         const ny = cy + dy;
-        if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-        if (!g.bloqueado[ny * COLS + nx]) return ny * COLS + nx;
+        if (nx < 0 || ny < 0 || nx >= g.cols || ny >= g.rows) continue;
+        if (!g.bloqueado[ny * g.cols + nx]) return ny * g.cols + nx;
       }
     }
   }
-  return cy * COLS + cx;
+  return cy * g.cols + cx;
 }
 
 export function lineaLibre(g: Grid, x1: number, y1: number, x2: number, y2: number) {
@@ -103,25 +113,24 @@ export function buscarCamino(
   sy: number,
   tx: number,
   ty: number,
-  maxNodos = 4000,
+  maxNodos = 3500,
 ): { x: number; y: number }[] {
+  const cols = g.cols;
   const inicio = masCercanaLibre(g, sx, sy);
   const fin = masCercanaLibre(g, tx, ty);
   if (inicio === fin) return [{ x: tx, y: ty }];
 
-  const n = COLS * ROWS;
+  const n = cols * g.rows;
   const gScore = new Float32Array(n).fill(Infinity);
   const padre = new Int32Array(n).fill(-1);
   const cerrado = new Uint8Array(n);
-  gScore[inicio] = 0;
-
-  // cola de prioridad binaria simple
-  const heap: number[] = [inicio];
   const f = new Float32Array(n).fill(Infinity);
-  const hx = (fin % COLS) * CELL;
-  const hy = Math.floor(fin / COLS) * CELL;
-  f[inicio] = Math.hypot(sx - hx, sy - hy);
+  gScore[inicio] = 0;
+  const fx = fin % cols;
+  const fy = (fin / cols) | 0;
+  f[inicio] = Math.hypot((inicio % cols) - fx, ((inicio / cols) | 0) - fy);
 
+  const heap: number[] = [inicio];
   const push = (idx: number) => {
     heap.push(idx);
     let i = heap.length - 1;
@@ -163,22 +172,21 @@ export function buscarCamino(
       encontrado = true;
       break;
     }
-    const cx = cur % COLS;
-    const cy = (cur / COLS) | 0;
+    const cx = cur % cols;
+    const cy = (cur / cols) | 0;
     for (const [dx, dy, w] of DIRS) {
       const nx = cx + dx;
       const ny = cy + dy;
-      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-      const ni = ny * COLS + nx;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= g.rows) continue;
+      const ni = ny * cols + nx;
       if (g.bloqueado[ni]) continue;
-      if (dx !== 0 && dy !== 0) {
-        if (g.bloqueado[cy * COLS + nx] || g.bloqueado[ny * COLS + cx]) continue;
-      }
+      if (dx !== 0 && dy !== 0 && (g.bloqueado[cy * cols + nx] || g.bloqueado[ny * cols + cx]))
+        continue;
       const tent = gScore[cur]! + w * g.coste[ni]!;
       if (tent < gScore[ni]!) {
         gScore[ni] = tent;
         padre[ni] = cur;
-        f[ni] = tent + Math.hypot(nx - (fin % COLS), ny - ((fin / COLS) | 0)) * 1.05;
+        f[ni] = tent + Math.hypot(nx - fx, ny - fy) * 1.05;
         push(ni);
       }
     }
@@ -188,13 +196,12 @@ export function buscarCamino(
   const puntos: { x: number; y: number }[] = [];
   let cur = fin;
   while (cur !== -1) {
-    puntos.push({ x: (cur % COLS) * CELL + CELL / 2, y: ((cur / COLS) | 0) * CELL + CELL / 2 });
+    puntos.push({ x: (cur % cols) * CELL + CELL / 2, y: ((cur / cols) | 0) * CELL + CELL / 2 });
     cur = padre[cur]!;
   }
   puntos.reverse();
   puntos.push({ x: tx, y: ty });
 
-  // Suavizado: salta nodos intermedios con línea de visión libre
   const suave: { x: number; y: number }[] = [];
   let i = 0;
   let desdeX = sx;
