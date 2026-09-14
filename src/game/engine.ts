@@ -267,7 +267,8 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   // El mago se ralentiza y no puede correr mientras mantiene el escudo
   if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
   if (e.boost && st.t < e.boost.hasta) base *= e.boost.mult;
-  if (st.t < e.slowHasta) base *= 0.45;
+  const conBoost = !!(e.boost && st.t < e.boost.hasta);
+  if (st.t < e.slowHasta && !conBoost) base *= 0.45;
   return base;
 }
 
