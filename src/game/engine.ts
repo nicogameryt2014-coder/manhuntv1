@@ -281,6 +281,7 @@ export type Config = {
   sobrevivientes: number; // 1..20 (incluye al jugador)
   asesinos: number; // 1..20
   duracion: number;
+  modo: ModoMuerte;
 };
 
 export function crearJuego(cfg: Config): GameState {
