@@ -358,6 +358,7 @@ function mover(e: Entity, dx: number, dy: number, st: GameState) {
 export function velocidad(e: Entity, st: GameState, corriendo: boolean): number {
   if (st.t < e.stunHasta) return 0;
   if (e.canalizando) return 0;
+  if (e.sufriendo) return SURV_WALK * SUFRIMIENTO.lentitud;
   const esSurv = e.team === "survivor";
   let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
   if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
@@ -368,7 +369,13 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 }
 
 export function puedeCorrer(e: Entity): boolean {
+  if (e.sufriendo) return false;
   return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+}
+
+/** Objetivo válido para un asesino: vivo y no arrastrándose. */
+export function atacable(e: Entity): boolean {
+  return e.vivo && !e.sufriendo;
 }
 
 function msg(st: GameState, texto: string) {
