@@ -28,6 +28,8 @@ type Hud = {
   estado: GameState["estado"];
   mensajes: string[];
   escudoActivo: boolean;
+  sufriendo: boolean;
+  reviveFrac: number;
 };
 
 type TouchMove = { x: number; y: number };
@@ -383,10 +385,23 @@ export function Game() {
                 </div>
                 <div className="mt-1 h-2 rounded bg-white/10">
                   <div
-                    className="h-2 rounded bg-primary transition-[width]"
+                    className={`h-2 rounded transition-[width] ${hud.sufriendo ? "bg-destructive" : "bg-primary"}`}
                     style={{ width: `${hud.hp}%` }}
                   />
                 </div>
+                {hud.sufriendo && (
+                  <>
+                    <div className="mt-1 h-2 rounded bg-white/10">
+                      <div
+                        className="h-2 rounded bg-blue-500 transition-[width]"
+                        style={{ width: `${hud.reviveFrac * 100}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 font-mono text-[11px] text-destructive">
+                      ¡Te arrastras! Un aliado debe quedarse a tu lado para revivirte.
+                    </div>
+                  </>
+                )}
                 <div className="mt-2 h-2 rounded bg-white/10">
                   <div
                     className="h-2 rounded bg-secondary"
