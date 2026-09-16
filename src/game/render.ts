@@ -377,7 +377,24 @@ function dibujarEntidad(
     ctx.fill();
     return;
   }
-  const base = e.isPlayer ? COL.player : e.team === "killer" ? COL.killer : COL.surv;
+  const base = e.sufriendo
+    ? "#b3364a"
+    : e.isPlayer
+      ? COL.player
+      : e.team === "killer"
+        ? COL.killer
+        : COL.surv;
+
+  if (e.sufriendo) {
+    const radio = SUFRIMIENTO.radioRevivir + e.r;
+    ctx.strokeStyle = "rgba(96, 165, 250, 0.55)";
+    ctx.setLineDash([8, 7]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, radio, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   if (e.escudo && st.t < e.escudo.hasta) {
     ctx.strokeStyle = "rgba(126, 178, 255, 0.9)";
