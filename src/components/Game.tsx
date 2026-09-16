@@ -10,6 +10,7 @@ import {
   type GameState,
   type Input,
   type ItemKind,
+  type ModoMuerte,
   type SurvivorAbility,
 } from "@/game/engine";
 import { render } from "@/game/render";
@@ -41,6 +42,7 @@ export function Game() {
   const [habilidad, setHabilidad] = useState<SurvivorAbility>("medico");
   const [nSobrevivientes, setNSobrevivientes] = useState(4);
   const [nAsesinos, setNAsesinos] = useState(2);
+  const [modo, setModo] = useState<ModoMuerte>("instantanea");
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -66,10 +68,11 @@ export function Game() {
         sobrevivientes: nSobrevivientes,
         asesinos: nAsesinos,
         duracion: 180,
+        modo,
       });
       setFase("jugando");
     },
-    [nSobrevivientes, nAsesinos],
+    [nSobrevivientes, nAsesinos, modo],
   );
 
 
@@ -273,6 +276,38 @@ export function Game() {
                 Se coordinan: uno persigue y el resto flanquea (1 a 20).
               </p>
             </div>
+          </div>
+
+          <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            Modo de muerte
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {([
+              {
+                id: "instantanea" as const,
+                nombre: "Muerte instantánea",
+                desc: "Si tu vida llega a 0, mueres al momento.",
+              },
+              {
+                id: "sufrimiento" as const,
+                nombre: "Sufrimiento",
+                desc: "Al caer te arrastras: vida roja que baja sola, dejas sangre y el asesino no puede golpearte. Un aliado puede revivirte quedándose 4 s a tu lado. A la tercera caída mueres.",
+              },
+            ]).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setModo(m.id)}
+                className={`rounded-xl border p-4 text-left transition ${
+                  modo === m.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card hover:bg-accent"
+                }`}
+              >
+                <span className="font-semibold">{m.nombre}</span>
+                <p className="mt-1 text-xs text-muted-foreground">{m.desc}</p>
+              </button>
+            ))}
           </div>
 
           <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
