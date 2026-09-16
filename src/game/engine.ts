@@ -1055,8 +1055,12 @@ export function step(st: GameState, dt: number, input: Input) {
     if (!e.vivo || e.isPlayer) continue;
     if (st.t < e.stunHasta || e.canalizando) {
       if (e.canalizando && st.t >= e.canalizando.fin) terminarCanal(st, e);
+      e.chequeoEn = st.t + 0.5;
+      e.ultX = e.x;
+      e.ultY = e.y;
       continue;
     }
+    antiAtasco(st, e, dt);
     if (e.team === "killer") iaAsesino(st, e, dt);
     else iaSobreviviente(st, e, dt);
   }
