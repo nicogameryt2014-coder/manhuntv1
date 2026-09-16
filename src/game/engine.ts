@@ -956,9 +956,11 @@ export function step(st: GameState, dt: number, input: Input) {
       else if (jugador.ability === "mago" && jugador.escudoActivoSobre !== null)
         cancelarEscudoMago(st, jugador);
     }
-    if (input.usarHabilidad) usarHabilidad(st, jugador);
-    if (input.recoger) intentarRecoger(st, jugador);
-    if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    if (!jugador.sufriendo) {
+      if (input.usarHabilidad) usarHabilidad(st, jugador);
+      if (input.recoger) intentarRecoger(st, jugador);
+      if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    }
 
     const corriendo = input.run && puedeCorrer(jugador);
     const v = velocidad(jugador, st, corriendo) * dt;
