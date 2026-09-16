@@ -383,6 +383,7 @@ function msg(st: GameState, texto: string) {
 }
 
 function danar(st: GameState, e: Entity, cantidad: number) {
+  if (e.sufriendo) return; // arrastrándose no se recibe daño externo
   let d = cantidad;
   if (e.escudo && st.t < e.escudo.hasta) {
     const absorbido = Math.min(e.escudo.hp, d);
@@ -391,11 +392,76 @@ function danar(st: GameState, e: Entity, cantidad: number) {
     if (e.escudo.hp <= 0) liberarEscudo(st, e);
   }
   e.hp -= d;
-  if (e.hp <= 0) {
-    e.hp = 0;
-    e.vivo = false;
-    msg(st, `${e.nombre} ha caído`);
+  if (e.hp <= 0) abatir(st, e);
+}
+
+/** Vida a 0: muerte directa o entrada al estado de sufrimiento. */
+function abatir(st: GameState, e: Entity) {
+  e.hp = 0;
+  if (st.modo === "sufrimiento" && e.team === "survivor" && e.caidas < SUFRIMIENTO.maxCaidas) {
+    e.caidas++;
+    e.sufriendo = true;
+    e.hp = e.maxHp;
+    e.revive = 0;
+    e.drenajeSig = st.t + 1;
+    e.canalizando = null;
+    e.boost = null;
+    e.veneno = null;
+    if (e.escudo) liberarEscudo(st, e);
+    msg(st, `${e.nombre} se arrastra (caída ${e.caidas})`);
+    return;
   }
+  e.sufriendo = false;
+  e.vivo = false;
+  msg(st, `${e.nombre} ha caído`);
+}
+
+function revivir(st: GameState, e: Entity) {
+  e.sufriendo = false;
+  e.revive = 0;
+  e.hp = (e.maxHp * SUFRIMIENTO.vidaAlRevivir) / 100;
+  e.boost = { mult: SUFRIMIENTO.boostRevivir, hasta: st.t + SUFRIMIENTO.duracionBoost };
+  msg(st, `${e.nombre} fue reanimado`);
+}
+
+/** Drenaje, sangre y barra de reanimación de quienes se arrastran. */
+function actualizarSufrimiento(st: GameState, dt: number) {
+  for (const e of st.entities) {
+    if (!e.vivo || !e.sufriendo) continue;
+
+    if (st.t >= e.drenajeSig) {
+      const pct = SUFRIMIENTO.drenajePorCaida[Math.min(e.caidas, SUFRIMIENTO.maxCaidas) - 1] ?? 4;
+      e.hp -= (e.maxHp * pct) / 100;
+      e.drenajeSig += 1;
+      if (e.hp <= 0) {
+        e.hp = 0;
+        e.sufriendo = false;
+        e.vivo = false;
+        msg(st, `${e.nombre} murió desangrado`);
+        continue;
+      }
+    }
+
+    if (st.t >= e.sangreSig) {
+      st.sangre.push({ x: e.x, y: e.y, r: 5 + Math.random() * 5, nacida: st.t });
+      e.sangreSig = st.t + 0.35;
+    }
+
+    const ayuda = st.entities.some(
+      (o) =>
+        o !== e &&
+        o.team === "survivor" &&
+        o.vivo &&
+        !o.sufriendo &&
+        Math.hypot(o.x - e.x, o.y - e.y) < SUFRIMIENTO.radioRevivir + o.r,
+    );
+    e.revive = Math.max(
+      0,
+      Math.min(SUFRIMIENTO.segundosRevivir, e.revive + (ayuda ? dt : -dt * 0.5)),
+    );
+    if (e.revive >= SUFRIMIENTO.segundosRevivir) revivir(st, e);
+  }
+  if (st.sangre.length > 600) st.sangre.splice(0, st.sangre.length - 600);
 }
 
 function liberarEscudo(st: GameState, objetivo: Entity) {
