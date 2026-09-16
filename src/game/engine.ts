@@ -158,6 +158,8 @@ export type GameState = {
   swings: Swing[];
   bubbles: Bubble[];
   pickups: Pickup[];
+  sangre: Blood[];
+  modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
   coord: Coord;
