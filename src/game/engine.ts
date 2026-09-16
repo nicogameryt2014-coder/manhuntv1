@@ -1037,6 +1037,7 @@ export function step(st: GameState, dt: number, input: Input) {
   }
 
   st.puddles = st.puddles.filter((p) => st.t < p.hasta);
+  st.sangre = st.sangre.filter((s) => st.t - s.nacida < 30);
   st.swings = st.swings.filter((s) => st.t < s.hasta);
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 
