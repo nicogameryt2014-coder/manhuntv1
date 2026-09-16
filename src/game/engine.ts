@@ -969,6 +969,7 @@ export function step(st: GameState, dt: number, input: Input) {
   }
 
   actualizarCoordinacion(st);
+  actualizarSufrimiento(st, dt);
 
   for (const e of st.entities) {
     if (!e.vivo || e.isPlayer) continue;
