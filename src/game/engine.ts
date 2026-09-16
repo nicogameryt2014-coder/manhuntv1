@@ -636,16 +636,37 @@ function fijarMeta(st: GameState, e: Entity, x: number, y: number, urgente = fal
   }
 }
 
+/** ¿Se puede avanzar `dist` px en ese ángulo sin chocar? */
+function libreEnAngulo(st: GameState, e: Entity, ang: number, dist: number): boolean {
+  const x = e.x + Math.cos(ang) * dist;
+  const y = e.y + Math.sin(ang) * dist;
+  if (x < e.r || y < e.r || x > WORLD_W - e.r || y > WORLD_H - e.r) return false;
+  return !colisiona(x, y, e.r, st.walls);
+}
+
 /** Avanza por el camino. Devuelve el ángulo de movimiento o null. */
 function seguirCamino(st: GameState, e: Entity, dt: number, corriendo: boolean): number | null {
-  if (e.caminoIdx >= e.camino.length) return null;
-  let nodo = e.camino[e.caminoIdx]!;
-  while (Math.hypot(nodo.x - e.x, nodo.y - e.y) < 18) {
-    e.caminoIdx++;
-    if (e.caminoIdx >= e.camino.length) return null;
-    nodo = e.camino[e.caminoIdx]!;
+  let ang: number | null = null;
+
+  if (st.t < e.desvioHasta) {
+    ang = e.desvioAng;
+  } else {
+    if (e.caminoIdx < e.camino.length) {
+      let nodo = e.camino[e.caminoIdx]!;
+      while (Math.hypot(nodo.x - e.x, nodo.y - e.y) < 18) {
+        e.caminoIdx++;
+        if (e.caminoIdx >= e.camino.length) break;
+        nodo = e.camino[e.caminoIdx]!;
+      }
+      if (e.caminoIdx < e.camino.length) ang = Math.atan2(nodo.y - e.y, nodo.x - e.x);
+    }
+    // sin ruta válida: se dirige en línea recta a su meta para no quedarse quieto
+    if (ang === null && e.meta && Math.hypot(e.meta.x - e.x, e.meta.y - e.y) > 12) {
+      ang = Math.atan2(e.meta.y - e.y, e.meta.x - e.x);
+    }
   }
-  const ang = Math.atan2(nodo.y - e.y, nodo.x - e.x);
+  if (ang === null) return null;
+
   // separación suave de compañeros para que no se amontonen
   let sx = 0;
   let sy = 0;
@@ -658,13 +679,58 @@ function seguirCamino(st: GameState, e: Entity, dt: number, corriendo: boolean):
     }
   }
   const v = velocidad(e, st, corriendo) * dt;
-  const dx = Math.cos(ang) + sx * 0.45;
-  const dy = Math.sin(ang) + sy * 0.45;
+  let dx = Math.cos(ang) + sx * 0.45;
+  let dy = Math.sin(ang) + sy * 0.45;
+  let dir = Math.atan2(dy, dx);
+
+  // si tiene una pared delante, desliza probando ángulos cercanos a izquierda y derecha
+  const sonda = Math.max(e.r + 6, v * 3);
+  if (!libreEnAngulo(st, e, dir, sonda)) {
+    const giros = [0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.2, -2.2];
+    for (const g of giros) {
+      if (libreEnAngulo(st, e, dir + g, sonda)) {
+        dir += g;
+        break;
+      }
+    }
+  }
+  dx = Math.cos(dir);
+  dy = Math.sin(dir);
   const l = Math.hypot(dx, dy) || 1;
   mover(e, (dx / l) * v, (dy / l) * v, st);
   e.fx = Math.cos(ang);
   e.fy = Math.sin(ang);
   return ang;
+}
+
+/** Detecta bots parados contra una esquina y los saca de ahí con un desvío. */
+function antiAtasco(st: GameState, e: Entity, dt: number) {
+  if (st.t < e.chequeoEn) return;
+  const esperado = velocidad(e, st, false) * 0.5;
+  const avance = Math.hypot(e.x - e.ultX, e.y - e.ultY);
+  e.chequeoEn = st.t + 0.5;
+  e.ultX = e.x;
+  e.ultY = e.y;
+  if (esperado <= 0 || st.t < e.desvioHasta) return;
+  if (avance > esperado * 0.28) return;
+
+  // atascado: olvida la ruta y busca una dirección realmente abierta
+  e.camino = [];
+  e.caminoIdx = 0;
+  e.meta = null;
+  e.repathEn = 0;
+  const base = Math.random() * Math.PI * 2;
+  let elegido = base;
+  for (let i = 0; i < 12; i++) {
+    const a = base + (i / 12) * Math.PI * 2;
+    if (libreEnAngulo(st, e, a, e.r + 46)) {
+      elegido = a;
+      break;
+    }
+  }
+  e.desvioAng = elegido;
+  e.desvioHasta = st.t + 0.7 + Math.random() * 0.4;
+  void dt;
 }
 
 function ve(st: GameState, a: Entity, b: Entity, rango = 520) {
