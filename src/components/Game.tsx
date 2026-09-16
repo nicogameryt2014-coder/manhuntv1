@@ -67,10 +67,11 @@ export function Game() {
         sobrevivientes: nSobrevivientes,
         asesinos: nAsesinos,
         duracion: 180,
+        modo,
       });
       setFase("jugando");
     },
-    [nSobrevivientes, nAsesinos],
+    [nSobrevivientes, nAsesinos, modo],
   );
 
 
