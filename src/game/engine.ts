@@ -810,7 +810,37 @@ function iaAsesino(st: GameState, e: Entity, dt: number) {
 
 function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
-  const aliados = st.entities.filter((o) => o.team === "survivor" && o.vivo && o !== e);
+  const aliados = st.entities.filter(
+    (o) => o.team === "survivor" && o.vivo && !o.sufriendo && o !== e,
+  );
+
+  // quien se arrastra sólo intenta llegar hasta un compañero en pie
+  if (e.sufriendo) {
+    e.rol = "huir";
+    const cerca = aliados.sort(
+      (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
+    )[0];
+    if (cerca) fijarMeta(st, e, cerca.x, cerca.y, true);
+    seguirCamino(st, e, dt, false);
+    return;
+  }
+
+  // reanimar a un compañero caído tiene prioridad si no hay un asesino encima
+  const caido = st.entities
+    .filter((o) => o.team === "survivor" && o.vivo && o.sufriendo)
+    .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
+  if (caido) {
+    const dCaido = Math.hypot(caido.x - e.x, caido.y - e.y);
+    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < 150);
+    if (dCaido < 760 && !asesinoCerca) {
+      e.rol = "rescatar";
+      if (dCaido > SUFRIMIENTO.radioRevivir * 0.6) {
+        fijarMeta(st, e, caido.x, caido.y, true);
+        seguirCamino(st, e, dt, puedeCorrer(e));
+      }
+      return;
+    }
+  }
 
   // amenaza: asesino visible o avisado por el equipo
   let amenaza: { x: number; y: number; d: number; ent: Entity | null } | null = null;
