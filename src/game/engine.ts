@@ -992,7 +992,7 @@ export function step(st: GameState, dt: number, input: Input) {
     }
     if (e.escudo && st.t >= e.escudo.hasta) liberarEscudo(st, e);
     if (e.boost && st.t >= e.boost.hasta) e.boost = null;
-    if (e.team === "survivor") {
+    if (e.team === "survivor" && !e.sufriendo) {
       for (const p of st.puddles) {
         if (Math.hypot(p.x - e.x, p.y - e.y) < p.r + e.r) {
           e.hp = Math.min(e.maxHp, e.hp + p.curacion * dt);
