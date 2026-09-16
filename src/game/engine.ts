@@ -1122,6 +1122,46 @@ export function step(st: GameState, dt: number, input: Input) {
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 
   const survVivos = st.entities.filter((e) => e.team === "survivor" && e.vivo);
-  if (!jugador.vivo || survVivos.length === 0) st.estado = "perdido";
-  else if (st.tiempoRestante <= 0) st.estado = "ganado";
+
+  // si el jugador murió sigue la partida como fantasma, observando a los demás
+  if (!jugador.vivo && survVivos.length > 0) {
+    const actual = st.entities.find((e) => e.id === st.espectando);
+    if (!actual || !actual.vivo) st.espectando = espectadorPorDefecto(st);
+  } else if (jugador.vivo) {
+    st.espectando = null;
+  }
+
+  if (survVivos.length === 0) st.estado = "perdido";
+  else if (st.tiempoRestante <= 0) st.estado = jugador.vivo ? "ganado" : "perdido";
+}
+
+function espectadorPorDefecto(st: GameState): number | null {
+  const jugador = st.entities.find((e) => e.isPlayer)!;
+  const vivos = st.entities
+    .filter((e) => e.vivo && !e.isPlayer && e.team === "survivor")
+    .sort(
+      (a, b) =>
+        Math.hypot(a.x - jugador.x, a.y - jugador.y) - Math.hypot(b.x - jugador.x, b.y - jugador.y),
+    );
+  const alt = st.entities.filter((e) => e.vivo && !e.isPlayer);
+  return (vivos[0] ?? alt[0])?.id ?? null;
+}
+
+/** Cambia a quién observa el jugador fantasma (sobrevivientes y luego asesinos). */
+export function cambiarEspectado(st: GameState, paso = 1) {
+  const lista = st.entities.filter((e) => e.vivo && !e.isPlayer);
+  if (!lista.length) {
+    st.espectando = null;
+    return;
+  }
+  const i = lista.findIndex((e) => e.id === st.espectando);
+  const sig = lista[((i < 0 ? 0 : i + paso) + lista.length * 2) % lista.length]!;
+  st.espectando = sig.id;
+}
+
+/** Entidad que sigue la cámara: el jugador vivo o su objetivo de espectador. */
+export function focoCamara(st: GameState): Entity {
+  const jugador = st.entities.find((e) => e.isPlayer)!;
+  if (jugador.vivo) return jugador;
+  return st.entities.find((e) => e.id === st.espectando && e.vivo) ?? jugador;
 }
