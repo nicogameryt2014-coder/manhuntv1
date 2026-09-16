@@ -434,8 +434,19 @@ function dibujarEntidad(
   const w = 34;
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w, 5);
-  ctx.fillStyle = e.team === "killer" ? "#e05b6b" : "#6ee7a8";
+  ctx.fillStyle = e.sufriendo ? "#ef2740" : e.team === "killer" ? "#e05b6b" : "#6ee7a8";
   ctx.fillRect(e.x - w / 2, e.y - e.r - 12, (w * Math.max(0, e.hp)) / e.maxHp, 5);
+  if (e.sufriendo) {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(e.x - w / 2, e.y - e.r - 19, w, 5);
+    ctx.fillStyle = "#4f9dff";
+    ctx.fillRect(
+      e.x - w / 2,
+      e.y - e.r - 19,
+      (w * e.revive) / SUFRIMIENTO.segundosRevivir,
+      5,
+    );
+  }
   if (e.escudo && st.t < e.escudo.hasta) {
     ctx.fillStyle = "#7eb2ff";
     ctx.fillRect(e.x - w / 2, e.y - e.r - 17, (w * e.escudo.hp) / 25, 3);
