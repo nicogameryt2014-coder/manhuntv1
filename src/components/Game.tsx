@@ -10,6 +10,7 @@ import {
   type GameState,
   type Input,
   type ItemKind,
+  type ModoMuerte,
   type SurvivorAbility,
 } from "@/game/engine";
 import { render } from "@/game/render";
