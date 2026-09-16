@@ -113,6 +113,12 @@ export type Entity = {
   meta: { x: number; y: number } | null;
   rol: Rol;
   objetivoId: number | null;
+  // anti-atasco
+  ultX: number;
+  ultY: number;
+  chequeoEn: number;
+  desvioHasta: number;
+  desvioAng: number;
 };
 
 export type Knife = { x: number; y: number; vx: number; vy: number; owner: number; vivo: boolean };
@@ -163,6 +169,8 @@ export type GameState = {
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
   coord: Coord;
+  /** id de la entidad que observa el jugador cuando ya está muerto (modo fantasma) */
+  espectando: number | null;
 };
 
 export type Input = {
@@ -244,6 +252,11 @@ function nuevaEntidad(
     meta: null,
     rol: team === "killer" ? "patrullar" : "buscar",
     objetivoId: null,
+    ultX: x,
+    ultY: y,
+    chequeoEn: 0,
+    desvioHasta: 0,
+    desvioAng: 0,
   };
 }
 
@@ -345,6 +358,7 @@ export function crearJuego(cfg: Config): GameState {
     mensajes: [],
     tiempoRestante: cfg.duracion,
     coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
+    espectando: null,
   };
 }
 
