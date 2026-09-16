@@ -340,6 +340,8 @@ export function crearJuego(cfg: Config): GameState {
     swings: [],
     bubbles: [],
     pickups,
+    sangre: [],
+    modo: cfg.modo,
     mensajes: [],
     tiempoRestante: cfg.duracion,
     coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
