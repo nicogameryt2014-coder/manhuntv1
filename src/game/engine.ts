@@ -517,7 +517,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
       let mejor: Entity | null = null;
       let mejorD = Infinity;
       for (const o of st.entities) {
-        if (o.team !== "survivor" || !o.vivo || o.id === e.id) continue;
+        if (o.team !== "survivor" || !o.vivo || o.sufriendo || o.id === e.id) continue;
         const d = Math.hypot(o.x - e.x, o.y - e.y);
         if (d < mejorD) {
           mejorD = d;
@@ -689,7 +689,7 @@ function puntoSeguro(st: GameState, e: Entity, killers: Entity[]) {
 
 function actualizarCoordinacion(st: GameState) {
   const killers = st.entities.filter((e) => e.team === "killer" && e.vivo);
-  const survs = st.entities.filter((e) => e.team === "survivor" && e.vivo);
+  const survs = st.entities.filter((e) => e.team === "survivor" && atacable(e));
 
   // Asesinos: comparten la presa vista más "rentable" (cercana + herida)
   let mejor: { e: Entity; score: number } | null = null;
@@ -740,7 +740,7 @@ function actualizarCoordinacion(st: GameState) {
 }
 
 function iaAsesino(st: GameState, e: Entity, dt: number) {
-  const survs = st.entities.filter((o) => o.team === "survivor" && o.vivo);
+  const survs = st.entities.filter((o) => o.team === "survivor" && atacable(o));
   if (!survs.length) return;
   const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
   const indice = killers.indexOf(e);
@@ -977,7 +977,7 @@ export function step(st: GameState, dt: number, input: Input) {
       continue;
     }
     for (const e of st.entities) {
-      if (!e.vivo || e.team !== "survivor") continue;
+      if (!atacable(e) || e.team !== "survivor") continue;
       if (Math.hypot(e.x - k.x, e.y - k.y) < e.r + 5) {
         danar(st, e, 25);
         k.vivo = false;
