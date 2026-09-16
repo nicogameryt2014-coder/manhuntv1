@@ -216,8 +216,8 @@ function indicadoresBorde(
       ang,
       alpha: Math.max(0.32, Math.min(0.95, 1 - dist / 1700)),
       esAsesino,
-      color: esAsesino ? "#e05b6b" : "#7fd1c0",
-      R: esAsesino ? 12 : 10,
+      color: e.sufriendo ? "#f5c518" : esAsesino ? "#e05b6b" : "#7fd1c0",
+      R: e.sufriendo ? 16 : esAsesino ? 12 : 10,
       dist,
     });
   }
