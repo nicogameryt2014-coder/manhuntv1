@@ -1,4 +1,4 @@
-import { WORLD_W, WORLD_H, type Entity, type GameState, ITEM_INFO } from "./engine";
+import { WORLD_W, WORLD_H, SUFRIMIENTO, type Entity, type GameState, ITEM_INFO } from "./engine";
 
 const COL = {
   suelo: "#151a22",
@@ -39,6 +39,14 @@ export function render(
     ctx.moveTo(0, y);
     ctx.lineTo(WORLD_W, y);
     ctx.stroke();
+  }
+
+  for (const s of st.sangre) {
+    const edad = (st.t - s.nacida) / 30;
+    ctx.fillStyle = `rgba(150, 18, 28, ${Math.max(0, 0.6 - edad * 0.6)})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   for (const p of st.puddles) {
