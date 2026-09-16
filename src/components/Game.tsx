@@ -42,6 +42,7 @@ export function Game() {
   const [habilidad, setHabilidad] = useState<SurvivorAbility>("medico");
   const [nSobrevivientes, setNSobrevivientes] = useState(4);
   const [nAsesinos, setNAsesinos] = useState(2);
+  const [modo, setModo] = useState<ModoMuerte>("instantanea");
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
