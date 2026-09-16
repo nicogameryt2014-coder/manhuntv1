@@ -120,6 +120,21 @@ export type Puddle = { x: number; y: number; r: number; hasta: number; curacion:
 export type Swing = { x: number; y: number; fx: number; fy: number; hasta: number };
 export type Bubble = { x: number; y: number; vy: number; vida: number };
 export type Pickup = { id: number; x: number; y: number; kind: ItemKind; tomado: boolean };
+export type Blood = { x: number; y: number; r: number; nacida: number };
+
+export type ModoMuerte = "instantanea" | "sufrimiento";
+
+/** Ajustes del estado de sufrimiento (arrastrarse tras caer a 0 HP). */
+export const SUFRIMIENTO = {
+  lentitud: 0.8,
+  drenajePorCaida: [2, 4], // % de vida por segundo en la 1.ª y 2.ª caída
+  maxCaidas: 2, // a la 3.ª caída se muere
+  radioRevivir: 15 * 2.5,
+  segundosRevivir: 4,
+  vidaAlRevivir: 20,
+  boostRevivir: 1.8,
+  duracionBoost: 5,
+};
 
 export type Coord = {
   // conocimiento compartido de los asesinos
