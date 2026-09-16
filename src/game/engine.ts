@@ -100,6 +100,12 @@ export type Entity = {
   ataqueListo: number;
   vivo: boolean;
   venenoArmadoHasta: number;
+  // estado de sufrimiento (modo "sufrimiento")
+  sufriendo: boolean;
+  caidas: number;
+  drenajeSig: number;
+  sangreSig: number;
+  revive: number;
   // navegación / IA
   camino: { x: number; y: number }[];
   caminoIdx: number;
@@ -210,6 +216,11 @@ function nuevaEntidad(
     ataqueListo: 0,
     vivo: true,
     venenoArmadoHasta: 0,
+    sufriendo: false,
+    caidas: 0,
+    drenajeSig: 0,
+    sangreSig: 0,
+    revive: 0,
     camino: [],
     caminoIdx: 0,
     repathEn: 0,
