@@ -100,6 +100,12 @@ export type Entity = {
   ataqueListo: number;
   vivo: boolean;
   venenoArmadoHasta: number;
+  // estado de sufrimiento (modo "sufrimiento")
+  sufriendo: boolean;
+  caidas: number;
+  drenajeSig: number;
+  sangreSig: number;
+  revive: number;
   // navegación / IA
   camino: { x: number; y: number }[];
   caminoIdx: number;
@@ -114,6 +120,21 @@ export type Puddle = { x: number; y: number; r: number; hasta: number; curacion:
 export type Swing = { x: number; y: number; fx: number; fy: number; hasta: number };
 export type Bubble = { x: number; y: number; vy: number; vida: number };
 export type Pickup = { id: number; x: number; y: number; kind: ItemKind; tomado: boolean };
+export type Blood = { x: number; y: number; r: number; nacida: number };
+
+export type ModoMuerte = "instantanea" | "sufrimiento";
+
+/** Ajustes del estado de sufrimiento (arrastrarse tras caer a 0 HP). */
+export const SUFRIMIENTO = {
+  lentitud: 0.8,
+  drenajePorCaida: [2, 4], // % de vida por segundo en la 1.ª y 2.ª caída
+  maxCaidas: 2, // a la 3.ª caída se muere
+  radioRevivir: 15 * 2.5,
+  segundosRevivir: 4,
+  vidaAlRevivir: 20,
+  boostRevivir: 1.8,
+  duracionBoost: 5,
+};
 
 export type Coord = {
   // conocimiento compartido de los asesinos
@@ -137,6 +158,8 @@ export type GameState = {
   swings: Swing[];
   bubbles: Bubble[];
   pickups: Pickup[];
+  sangre: Blood[];
+  modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
   coord: Coord;
@@ -210,6 +233,11 @@ function nuevaEntidad(
     ataqueListo: 0,
     vivo: true,
     venenoArmadoHasta: 0,
+    sufriendo: false,
+    caidas: 0,
+    drenajeSig: 0,
+    sangreSig: 0,
+    revive: 0,
     camino: [],
     caminoIdx: 0,
     repathEn: 0,
@@ -253,6 +281,7 @@ export type Config = {
   sobrevivientes: number; // 1..20 (incluye al jugador)
   asesinos: number; // 1..20
   duracion: number;
+  modo: ModoMuerte;
 };
 
 export function crearJuego(cfg: Config): GameState {
@@ -311,6 +340,8 @@ export function crearJuego(cfg: Config): GameState {
     swings: [],
     bubbles: [],
     pickups,
+    sangre: [],
+    modo: cfg.modo,
     mensajes: [],
     tiempoRestante: cfg.duracion,
     coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
@@ -327,6 +358,7 @@ function mover(e: Entity, dx: number, dy: number, st: GameState) {
 export function velocidad(e: Entity, st: GameState, corriendo: boolean): number {
   if (st.t < e.stunHasta) return 0;
   if (e.canalizando) return 0;
+  if (e.sufriendo) return SURV_WALK * SUFRIMIENTO.lentitud;
   const esSurv = e.team === "survivor";
   let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
   if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
@@ -337,7 +369,13 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 }
 
 export function puedeCorrer(e: Entity): boolean {
+  if (e.sufriendo) return false;
   return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+}
+
+/** Objetivo válido para un asesino: vivo y no arrastrándose. */
+export function atacable(e: Entity): boolean {
+  return e.vivo && !e.sufriendo;
 }
 
 function msg(st: GameState, texto: string) {
@@ -345,6 +383,7 @@ function msg(st: GameState, texto: string) {
 }
 
 function danar(st: GameState, e: Entity, cantidad: number) {
+  if (e.sufriendo) return; // arrastrándose no se recibe daño externo
   let d = cantidad;
   if (e.escudo && st.t < e.escudo.hasta) {
     const absorbido = Math.min(e.escudo.hp, d);
@@ -353,11 +392,76 @@ function danar(st: GameState, e: Entity, cantidad: number) {
     if (e.escudo.hp <= 0) liberarEscudo(st, e);
   }
   e.hp -= d;
-  if (e.hp <= 0) {
-    e.hp = 0;
-    e.vivo = false;
-    msg(st, `${e.nombre} ha caído`);
+  if (e.hp <= 0) abatir(st, e);
+}
+
+/** Vida a 0: muerte directa o entrada al estado de sufrimiento. */
+function abatir(st: GameState, e: Entity) {
+  e.hp = 0;
+  if (st.modo === "sufrimiento" && e.team === "survivor" && e.caidas < SUFRIMIENTO.maxCaidas) {
+    e.caidas++;
+    e.sufriendo = true;
+    e.hp = e.maxHp;
+    e.revive = 0;
+    e.drenajeSig = st.t + 1;
+    e.canalizando = null;
+    e.boost = null;
+    e.veneno = null;
+    if (e.escudo) liberarEscudo(st, e);
+    msg(st, `${e.nombre} se arrastra (caída ${e.caidas})`);
+    return;
   }
+  e.sufriendo = false;
+  e.vivo = false;
+  msg(st, `${e.nombre} ha caído`);
+}
+
+function revivir(st: GameState, e: Entity) {
+  e.sufriendo = false;
+  e.revive = 0;
+  e.hp = (e.maxHp * SUFRIMIENTO.vidaAlRevivir) / 100;
+  e.boost = { mult: SUFRIMIENTO.boostRevivir, hasta: st.t + SUFRIMIENTO.duracionBoost };
+  msg(st, `${e.nombre} fue reanimado`);
+}
+
+/** Drenaje, sangre y barra de reanimación de quienes se arrastran. */
+function actualizarSufrimiento(st: GameState, dt: number) {
+  for (const e of st.entities) {
+    if (!e.vivo || !e.sufriendo) continue;
+
+    if (st.t >= e.drenajeSig) {
+      const pct = SUFRIMIENTO.drenajePorCaida[Math.min(e.caidas, SUFRIMIENTO.maxCaidas) - 1] ?? 4;
+      e.hp -= (e.maxHp * pct) / 100;
+      e.drenajeSig += 1;
+      if (e.hp <= 0) {
+        e.hp = 0;
+        e.sufriendo = false;
+        e.vivo = false;
+        msg(st, `${e.nombre} murió desangrado`);
+        continue;
+      }
+    }
+
+    if (st.t >= e.sangreSig) {
+      st.sangre.push({ x: e.x, y: e.y, r: 5 + Math.random() * 5, nacida: st.t });
+      e.sangreSig = st.t + 0.35;
+    }
+
+    const ayuda = st.entities.some(
+      (o) =>
+        o !== e &&
+        o.team === "survivor" &&
+        o.vivo &&
+        !o.sufriendo &&
+        Math.hypot(o.x - e.x, o.y - e.y) < SUFRIMIENTO.radioRevivir + o.r,
+    );
+    e.revive = Math.max(
+      0,
+      Math.min(SUFRIMIENTO.segundosRevivir, e.revive + (ayuda ? dt : -dt * 0.5)),
+    );
+    if (e.revive >= SUFRIMIENTO.segundosRevivir) revivir(st, e);
+  }
+  if (st.sangre.length > 600) st.sangre.splice(0, st.sangre.length - 600);
 }
 
 function liberarEscudo(st: GameState, objetivo: Entity) {
@@ -413,7 +517,7 @@ export function usarHabilidad(st: GameState, e: Entity) {
       let mejor: Entity | null = null;
       let mejorD = Infinity;
       for (const o of st.entities) {
-        if (o.team !== "survivor" || !o.vivo || o.id === e.id) continue;
+        if (o.team !== "survivor" || !o.vivo || o.sufriendo || o.id === e.id) continue;
         const d = Math.hypot(o.x - e.x, o.y - e.y);
         if (d < mejorD) {
           mejorD = d;
@@ -585,7 +689,7 @@ function puntoSeguro(st: GameState, e: Entity, killers: Entity[]) {
 
 function actualizarCoordinacion(st: GameState) {
   const killers = st.entities.filter((e) => e.team === "killer" && e.vivo);
-  const survs = st.entities.filter((e) => e.team === "survivor" && e.vivo);
+  const survs = st.entities.filter((e) => e.team === "survivor" && atacable(e));
 
   // Asesinos: comparten la presa vista más "rentable" (cercana + herida)
   let mejor: { e: Entity; score: number } | null = null;
@@ -636,7 +740,7 @@ function actualizarCoordinacion(st: GameState) {
 }
 
 function iaAsesino(st: GameState, e: Entity, dt: number) {
-  const survs = st.entities.filter((o) => o.team === "survivor" && o.vivo);
+  const survs = st.entities.filter((o) => o.team === "survivor" && atacable(o));
   if (!survs.length) return;
   const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
   const indice = killers.indexOf(e);
@@ -706,7 +810,37 @@ function iaAsesino(st: GameState, e: Entity, dt: number) {
 
 function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   const killers = st.entities.filter((o) => o.team === "killer" && o.vivo);
-  const aliados = st.entities.filter((o) => o.team === "survivor" && o.vivo && o !== e);
+  const aliados = st.entities.filter(
+    (o) => o.team === "survivor" && o.vivo && !o.sufriendo && o !== e,
+  );
+
+  // quien se arrastra sólo intenta llegar hasta un compañero en pie
+  if (e.sufriendo) {
+    e.rol = "huir";
+    const cerca = aliados.sort(
+      (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
+    )[0];
+    if (cerca) fijarMeta(st, e, cerca.x, cerca.y, true);
+    seguirCamino(st, e, dt, false);
+    return;
+  }
+
+  // reanimar a un compañero caído tiene prioridad si no hay un asesino encima
+  const caido = st.entities
+    .filter((o) => o.team === "survivor" && o.vivo && o.sufriendo)
+    .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
+  if (caido) {
+    const dCaido = Math.hypot(caido.x - e.x, caido.y - e.y);
+    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < 150);
+    if (dCaido < 760 && !asesinoCerca) {
+      e.rol = "rescatar";
+      if (dCaido > SUFRIMIENTO.radioRevivir * 0.6) {
+        fijarMeta(st, e, caido.x, caido.y, true);
+        seguirCamino(st, e, dt, puedeCorrer(e));
+      }
+      return;
+    }
+  }
 
   // amenaza: asesino visible o avisado por el equipo
   let amenaza: { x: number; y: number; d: number; ent: Entity | null } | null = null;
@@ -822,9 +956,11 @@ export function step(st: GameState, dt: number, input: Input) {
       else if (jugador.ability === "mago" && jugador.escudoActivoSobre !== null)
         cancelarEscudoMago(st, jugador);
     }
-    if (input.usarHabilidad) usarHabilidad(st, jugador);
-    if (input.recoger) intentarRecoger(st, jugador);
-    if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    if (!jugador.sufriendo) {
+      if (input.usarHabilidad) usarHabilidad(st, jugador);
+      if (input.recoger) intentarRecoger(st, jugador);
+      if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    }
 
     const corriendo = input.run && puedeCorrer(jugador);
     const v = velocidad(jugador, st, corriendo) * dt;
@@ -833,6 +969,7 @@ export function step(st: GameState, dt: number, input: Input) {
   }
 
   actualizarCoordinacion(st);
+  actualizarSufrimiento(st, dt);
 
   for (const e of st.entities) {
     if (!e.vivo || e.isPlayer) continue;
@@ -855,7 +992,7 @@ export function step(st: GameState, dt: number, input: Input) {
     }
     if (e.escudo && st.t >= e.escudo.hasta) liberarEscudo(st, e);
     if (e.boost && st.t >= e.boost.hasta) e.boost = null;
-    if (e.team === "survivor") {
+    if (e.team === "survivor" && !e.sufriendo) {
       for (const p of st.puddles) {
         if (Math.hypot(p.x - e.x, p.y - e.y) < p.r + e.r) {
           e.hp = Math.min(e.maxHp, e.hp + p.curacion * dt);
@@ -873,7 +1010,7 @@ export function step(st: GameState, dt: number, input: Input) {
       continue;
     }
     for (const e of st.entities) {
-      if (!e.vivo || e.team !== "survivor") continue;
+      if (!atacable(e) || e.team !== "survivor") continue;
       if (Math.hypot(e.x - k.x, e.y - k.y) < e.r + 5) {
         danar(st, e, 25);
         k.vivo = false;
@@ -900,6 +1037,7 @@ export function step(st: GameState, dt: number, input: Input) {
   }
 
   st.puddles = st.puddles.filter((p) => st.t < p.hasta);
+  st.sangre = st.sangre.filter((s) => st.t - s.nacida < 30);
   st.swings = st.swings.filter((s) => st.t < s.hasta);
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 

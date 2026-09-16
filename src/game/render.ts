@@ -1,4 +1,4 @@
-import { WORLD_W, WORLD_H, type Entity, type GameState, ITEM_INFO } from "./engine";
+import { WORLD_W, WORLD_H, SUFRIMIENTO, type Entity, type GameState, ITEM_INFO } from "./engine";
 
 const COL = {
   suelo: "#151a22",
@@ -39,6 +39,14 @@ export function render(
     ctx.moveTo(0, y);
     ctx.lineTo(WORLD_W, y);
     ctx.stroke();
+  }
+
+  for (const s of st.sangre) {
+    const edad = (st.t - s.nacida) / 30;
+    ctx.fillStyle = `rgba(150, 18, 28, ${Math.max(0, 0.6 - edad * 0.6)})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   for (const p of st.puddles) {
@@ -208,8 +216,8 @@ function indicadoresBorde(
       ang,
       alpha: Math.max(0.32, Math.min(0.95, 1 - dist / 1700)),
       esAsesino,
-      color: esAsesino ? "#e05b6b" : "#7fd1c0",
-      R: esAsesino ? 12 : 10,
+      color: e.sufriendo ? "#f5c518" : esAsesino ? "#e05b6b" : "#7fd1c0",
+      R: e.sufriendo ? 16 : esAsesino ? 12 : 10,
       dist,
     });
   }
@@ -369,7 +377,24 @@ function dibujarEntidad(
     ctx.fill();
     return;
   }
-  const base = e.isPlayer ? COL.player : e.team === "killer" ? COL.killer : COL.surv;
+  const base = e.sufriendo
+    ? "#b3364a"
+    : e.isPlayer
+      ? COL.player
+      : e.team === "killer"
+        ? COL.killer
+        : COL.surv;
+
+  if (e.sufriendo) {
+    const radio = SUFRIMIENTO.radioRevivir + e.r;
+    ctx.strokeStyle = "rgba(96, 165, 250, 0.55)";
+    ctx.setLineDash([8, 7]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, radio, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   if (e.escudo && st.t < e.escudo.hasta) {
     ctx.strokeStyle = "rgba(126, 178, 255, 0.9)";
@@ -409,8 +434,19 @@ function dibujarEntidad(
   const w = 34;
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w, 5);
-  ctx.fillStyle = e.team === "killer" ? "#e05b6b" : "#6ee7a8";
+  ctx.fillStyle = e.sufriendo ? "#ef2740" : e.team === "killer" ? "#e05b6b" : "#6ee7a8";
   ctx.fillRect(e.x - w / 2, e.y - e.r - 12, (w * Math.max(0, e.hp)) / e.maxHp, 5);
+  if (e.sufriendo) {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(e.x - w / 2, e.y - e.r - 19, w, 5);
+    ctx.fillStyle = "#4f9dff";
+    ctx.fillRect(
+      e.x - w / 2,
+      e.y - e.r - 19,
+      (w * e.revive) / SUFRIMIENTO.segundosRevivir,
+      5,
+    );
+  }
   if (e.escudo && st.t < e.escudo.hasta) {
     ctx.fillStyle = "#7eb2ff";
     ctx.fillRect(e.x - w / 2, e.y - e.r - 17, (w * e.escudo.hp) / 25, 3);
