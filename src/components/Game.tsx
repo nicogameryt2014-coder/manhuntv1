@@ -12,6 +12,7 @@ import {
   type ItemKind,
   type ModoMuerte,
   type SurvivorAbility,
+  SUFRIMIENTO,
 } from "@/game/engine";
 import { render } from "@/game/render";
 
@@ -151,6 +152,8 @@ export function Game() {
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
       setHud({
+        sufriendo: p.sufriendo,
+        reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         hp: Math.max(0, Math.round(p.hp)),
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
