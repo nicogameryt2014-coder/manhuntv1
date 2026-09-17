@@ -31,6 +31,8 @@ type Hud = {
   escudoActivo: boolean;
   sufriendo: boolean;
   reviveFrac: number;
+  fantasma: boolean;
+  observando: string | null;
 };
 
 type TouchMove = { x: number; y: number };
