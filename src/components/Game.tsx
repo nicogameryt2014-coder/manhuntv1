@@ -153,7 +153,14 @@ export function Game() {
 
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
+      const gris = p.vivo ? Math.max(0, 1 - p.hp / p.maxHp / 0.7) : 1;
+      canvas.style.filter = gris > 0.02 ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)})` : "";
+      const observado = !p.vivo
+        ? (st.entities.find((e) => e.id === st.espectando)?.nombre ?? null)
+        : null;
       setHud({
+        fantasma: !p.vivo,
+        observando: observado,
         sufriendo: p.sufriendo,
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         hp: Math.max(0, Math.round(p.hp)),
