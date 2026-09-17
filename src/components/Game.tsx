@@ -32,6 +32,7 @@ type Hud = {
   escudoActivo: boolean;
   sufriendo: boolean;
   reviveFrac: number;
+  peligro: number;
   fantasma: boolean;
   observando: string | null;
 };
@@ -162,8 +163,14 @@ export function Game() {
 
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
-      const gris = p.vivo ? Math.max(0, 1 - p.hp / p.maxHp / 0.7) : 1;
-      canvas.style.filter = gris > 0.02 ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)})` : "";
+      const vidaFrac = Math.max(0, Math.min(1, p.hp / p.maxHp));
+      const gris = !p.vivo || p.sufriendo ? 1 : Math.max(0, 1 - vidaFrac / 0.7);
+      const peligro = p.sufriendo && p.vivo ? 1 - vidaFrac : 0;
+      const brillo = 1 - peligro * 0.45;
+      canvas.style.filter =
+        gris > 0.02 || peligro > 0.02
+          ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)}) brightness(${brillo.toFixed(2)})`
+          : "";
       const observado = !p.vivo
         ? (st.entities.find((e) => e.id === st.espectando)?.nombre ?? null)
         : null;
@@ -172,6 +179,7 @@ export function Game() {
         observando: observado,
         sufriendo: p.sufriendo,
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
+        peligro,
         hp: Math.max(0, Math.round(p.hp)),
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
@@ -394,6 +402,16 @@ export function Game() {
           height={vista.h}
           className="block h-auto max-h-[calc(100dvh-11rem)] w-full touch-none bg-card object-contain shadow-2xl sm:max-h-none"
         />
+
+        {/* Tinte rojo de peligro (estado de sufrimiento) */}
+        {hud && hud.peligro > 0.02 && (
+          <div
+            className="pointer-events-none absolute inset-0 transition-opacity duration-300"
+            style={{
+              background: `radial-gradient(ellipse at center, rgba(120,0,0,${(hud.peligro * 0.25).toFixed(2)}) 0%, rgba(90,0,0,${(hud.peligro * 0.65).toFixed(2)}) 100%)`,
+            }}
+          />
+        )}
 
         {/* HUD */}
         {hud && (
