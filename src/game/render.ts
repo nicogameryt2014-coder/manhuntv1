@@ -158,10 +158,35 @@ export function render(
 
   for (const e of st.entities) dibujarEntidad(ctx, st, e, debug);
 
+  if (fantasma) dibujarFantasma(ctx, st, foco);
+
   ctx.restore();
 
   indicadoresBorde(ctx, st, jugador, camX, camY, vw, vh);
-  efectosVidaBaja(ctx, st, jugador, vw, vh);
+  if (!fantasma) efectosVidaBaja(ctx, st, jugadorReal, vw, vh);
+}
+
+/** Espíritu del jugador muerto flotando junto a quien observa. */
+function dibujarFantasma(ctx: CanvasRenderingContext2D, st: GameState, foco: Entity) {
+  const x = foco.x - 30;
+  const y = foco.y - 34 + Math.sin(st.t * 2) * 5;
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#dfe6f2";
+  ctx.beginPath();
+  ctx.arc(x, y, 12, Math.PI, 0);
+  ctx.lineTo(x + 12, y + 12);
+  for (let i = 0; i < 3; i++) {
+    ctx.quadraticCurveTo(x + 8 - i * 8, y + 18, x + 4 - i * 8, y + 12);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#151a22";
+  ctx.beginPath();
+  ctx.arc(x - 4, y - 2, 2, 0, Math.PI * 2);
+  ctx.arc(x + 4, y - 2, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function dibujarCaminos(ctx: CanvasRenderingContext2D, st: GameState) {
