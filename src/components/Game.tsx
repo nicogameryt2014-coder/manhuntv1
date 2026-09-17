@@ -6,6 +6,7 @@ import {
   ITEM_INFO,
   SURVIVOR_ABILITIES,
   crearJuego,
+  cambiarEspectado,
   step,
   type GameState,
   type Input,
