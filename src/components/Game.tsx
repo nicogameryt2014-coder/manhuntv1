@@ -6,6 +6,7 @@ import {
   ITEM_INFO,
   SURVIVOR_ABILITIES,
   crearJuego,
+  cambiarEspectado,
   step,
   type GameState,
   type Input,
@@ -31,6 +32,8 @@ type Hud = {
   escudoActivo: boolean;
   sufriendo: boolean;
   reviveFrac: number;
+  fantasma: boolean;
+  observando: string | null;
 };
 
 type TouchMove = { x: number; y: number };
@@ -105,6 +108,14 @@ export function Game() {
       if (k === "1") pulsos.current.item = "botiquin";
       if (k === "2") pulsos.current.item = "cola";
       if (k === "escape") pulsos.current.cancelar = true;
+      if (k === "tab" || k === "f") {
+        const st = stateRef.current;
+        const p = st?.entities.find((e) => e.isPlayer);
+        if (st && p && !p.vivo) {
+          ev.preventDefault();
+          cambiarEspectado(st, k === "tab" && ev.shiftKey ? -1 : 1);
+        }
+      }
     };
     const up = (ev: KeyboardEvent) => {
       keys.current[ev.key.toLowerCase()] = false;
@@ -151,7 +162,14 @@ export function Game() {
 
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
+      const gris = p.vivo ? Math.max(0, 1 - p.hp / p.maxHp / 0.7) : 1;
+      canvas.style.filter = gris > 0.02 ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)})` : "";
+      const observado = !p.vivo
+        ? (st.entities.find((e) => e.id === st.espectando)?.nombre ?? null)
+        : null;
       setHud({
+        fantasma: !p.vivo,
+        observando: observado,
         sufriendo: p.sufriendo,
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         hp: Math.max(0, Math.round(p.hp)),
@@ -451,6 +469,21 @@ export function Game() {
                 </div>
               ))}
             </div>
+
+            {hud.fantasma && hud.estado === "jugando" && (
+              <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-background/85 px-3 py-2 font-mono text-[11px] backdrop-blur sm:bottom-4">
+                <span>
+                  👻 Eres un fantasma · observando a {hud.observando ?? "nadie"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => stateRef.current && cambiarEspectado(stateRef.current, 1)}
+                >
+                  Cambiar (F)
+                </Button>
+              </div>
+            )}
 
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
