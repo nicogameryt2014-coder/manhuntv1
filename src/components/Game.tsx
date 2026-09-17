@@ -470,6 +470,21 @@ export function Game() {
               ))}
             </div>
 
+            {hud.fantasma && hud.estado === "jugando" && (
+              <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-background/85 px-3 py-2 font-mono text-[11px] backdrop-blur sm:bottom-4">
+                <span>
+                  👻 Eres un fantasma · observando a {hud.observando ?? "nadie"}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => stateRef.current && cambiarEspectado(stateRef.current, 1)}
+                >
+                  Cambiar (F)
+                </Button>
+              </div>
+            )}
+
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
                 <h2 className="text-3xl font-black sm:text-4xl">
