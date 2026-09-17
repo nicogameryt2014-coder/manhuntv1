@@ -25,9 +25,12 @@ export function render(
   vh: number,
   debug: boolean,
 ) {
-  const jugador = st.entities.find((e) => e.isPlayer)!;
-  const camX = Math.max(0, Math.min(WORLD_W - vw, jugador.x - vw / 2));
-  const camY = Math.max(0, Math.min(WORLD_H - vh, jugador.y - vh / 2));
+  const jugadorReal = st.entities.find((e) => e.isPlayer)!;
+  const foco = focoCamara(st);
+  const fantasma = !jugadorReal.vivo;
+  const jugador = foco;
+  const camX = Math.max(0, Math.min(WORLD_W - vw, foco.x - vw / 2));
+  const camY = Math.max(0, Math.min(WORLD_H - vh, foco.y - vh / 2));
 
   ctx.save();
   ctx.fillStyle = COL.suelo;
