@@ -1,4 +1,12 @@
-import { WORLD_W, WORLD_H, SUFRIMIENTO, type Entity, type GameState, ITEM_INFO } from "./engine";
+import {
+  WORLD_W,
+  WORLD_H,
+  SUFRIMIENTO,
+  focoCamara,
+  type Entity,
+  type GameState,
+  ITEM_INFO,
+} from "./engine";
 
 const COL = {
   suelo: "#151a22",
