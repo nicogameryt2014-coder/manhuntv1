@@ -107,6 +107,14 @@ export function Game() {
       if (k === "1") pulsos.current.item = "botiquin";
       if (k === "2") pulsos.current.item = "cola";
       if (k === "escape") pulsos.current.cancelar = true;
+      if (k === "tab" || k === "f") {
+        const st = stateRef.current;
+        const p = st?.entities.find((e) => e.isPlayer);
+        if (st && p && !p.vivo) {
+          ev.preventDefault();
+          cambiarEspectado(st, k === "tab" && ev.shiftKey ? -1 : 1);
+        }
+      }
     };
     const up = (ev: KeyboardEvent) => {
       keys.current[ev.key.toLowerCase()] = false;
