@@ -32,6 +32,7 @@ type Hud = {
   escudoActivo: boolean;
   sufriendo: boolean;
   reviveFrac: number;
+  peligro: number;
   fantasma: boolean;
   observando: string | null;
 };
@@ -162,8 +163,14 @@ export function Game() {
 
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
-      const gris = p.vivo ? Math.max(0, 1 - p.hp / p.maxHp / 0.7) : 1;
-      canvas.style.filter = gris > 0.02 ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)})` : "";
+      const vidaFrac = Math.max(0, Math.min(1, p.hp / p.maxHp));
+      const gris = !p.vivo || p.sufriendo ? 1 : Math.max(0, 1 - vidaFrac / 0.7);
+      const peligro = p.sufriendo && p.vivo ? 1 - vidaFrac : 0;
+      const brillo = 1 - peligro * 0.45;
+      canvas.style.filter =
+        gris > 0.02 || peligro > 0.02
+          ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)}) brightness(${brillo.toFixed(2)})`
+          : "";
       const observado = !p.vivo
         ? (st.entities.find((e) => e.id === st.espectando)?.nombre ?? null)
         : null;
