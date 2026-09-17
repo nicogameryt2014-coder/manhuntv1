@@ -179,6 +179,7 @@ export function Game() {
         observando: observado,
         sufriendo: p.sufriendo,
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
+        peligro,
         hp: Math.max(0, Math.round(p.hp)),
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
@@ -401,6 +402,16 @@ export function Game() {
           height={vista.h}
           className="block h-auto max-h-[calc(100dvh-11rem)] w-full touch-none bg-card object-contain shadow-2xl sm:max-h-none"
         />
+
+        {/* Tinte rojo de peligro (estado de sufrimiento) */}
+        {hud && hud.peligro > 0.02 && (
+          <div
+            className="pointer-events-none absolute inset-0 transition-opacity duration-300"
+            style={{
+              background: `radial-gradient(ellipse at center, rgba(120,0,0,${(hud.peligro * 0.25).toFixed(2)}) 0%, rgba(90,0,0,${(hud.peligro * 0.65).toFixed(2)}) 100%)`,
+            }}
+          />
+        )}
 
         {/* HUD */}
         {hud && (
