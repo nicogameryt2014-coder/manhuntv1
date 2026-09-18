@@ -370,7 +370,7 @@ export function Game() {
                 <li>Shift — correr</li>
                 <li>Espacio — habilidad</li>
                 <li>E — recoger objeto</li>
-                <li>1 / 2 — botiquín / cola</li>
+                <li>1 / 2 / 3 — botiquín / cola / antídoto</li>
                 <li>Esc — cancelar acción</li>
               </ul>
             </div>
@@ -592,6 +592,15 @@ export function Game() {
               onPointerDown={() => pulsar("recoger", "cola")}
               className="size-12 touch-none"
             ><Zap /></Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Usar antídoto"
+              disabled={!hud.inventario.includes("antidoto")}
+              onPointerDown={() => pulsar("recoger", "antidoto")}
+              className="size-12 touch-none"
+            ><FlaskConical /></Button>
             <Button type="button" variant="outline" size="icon" aria-label="Recoger objeto" onPointerDown={() => pulsar("recoger")} className="size-12 touch-none"><PackageOpen /></Button>
             <Button type="button" variant="outline" size="icon" aria-label="Cancelar acción" onPointerDown={() => pulsar("cancelar")} className="size-12 touch-none"><X /></Button>
             <Button
