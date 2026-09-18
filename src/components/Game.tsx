@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
-import { Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
+import { FlaskConical, Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ABILITY_INFO,
@@ -108,6 +108,7 @@ export function Game() {
       if (k === "e") pulsos.current.recoger = true;
       if (k === "1") pulsos.current.item = "botiquin";
       if (k === "2") pulsos.current.item = "cola";
+      if (k === "3") pulsos.current.item = "antidoto";
       if (k === "escape") pulsos.current.cancelar = true;
       if (k === "tab" || k === "f") {
         const st = stateRef.current;
@@ -369,7 +370,7 @@ export function Game() {
                 <li>Shift — correr</li>
                 <li>Espacio — habilidad</li>
                 <li>E — recoger objeto</li>
-                <li>1 / 2 — botiquín / cola</li>
+                <li>1 / 2 / 3 — botiquín / cola / antídoto</li>
                 <li>Esc — cancelar acción</li>
               </ul>
             </div>
@@ -477,6 +478,7 @@ export function Game() {
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
                 <div>1 · Botiquín {hud.inventario.includes("botiquin") ? "✔" : "—"}</div>
                 <div>2 · Cola {hud.inventario.includes("cola") ? "✔" : "—"}</div>
+                <div>3 · Antídoto {hud.inventario.includes("antidoto") ? "✔" : "—"}</div>
               </div>
             </div>
 
@@ -590,6 +592,15 @@ export function Game() {
               onPointerDown={() => pulsar("recoger", "cola")}
               className="size-12 touch-none"
             ><Zap /></Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              aria-label="Usar antídoto"
+              disabled={!hud.inventario.includes("antidoto")}
+              onPointerDown={() => pulsar("recoger", "antidoto")}
+              className="size-12 touch-none"
+            ><FlaskConical /></Button>
             <Button type="button" variant="outline" size="icon" aria-label="Recoger objeto" onPointerDown={() => pulsar("recoger")} className="size-12 touch-none"><PackageOpen /></Button>
             <Button type="button" variant="outline" size="icon" aria-label="Cancelar acción" onPointerDown={() => pulsar("cancelar")} className="size-12 touch-none"><X /></Button>
             <Button

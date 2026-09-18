@@ -5,7 +5,7 @@ import { buscarCamino, construirGrid, lineaLibre, type Grid } from "./pathfind";
 
 export type SurvivorAbility = "medico" | "atacante" | "asustadizo" | "mago";
 export type KillerAbility = "venenoso" | "ninja";
-export type ItemKind = "botiquin" | "cola";
+export type ItemKind = "botiquin" | "cola" | "antidoto";
 
 export const SURVIVOR_ABILITIES: SurvivorAbility[] = [
   "medico",
@@ -57,6 +57,11 @@ export const ITEM_INFO: Record<
 > = {
   botiquin: { nombre: "Botiquín", canal: 5, desc: "Cura 35 HP (5 s, cancelable)" },
   cola: { nombre: "Cola", canal: 2, desc: "1.5x velocidad por 10 s (2 s, cancelable)" },
+  antidoto: {
+    nombre: "Antídoto",
+    canal: 5,
+    desc: "Sólo al sufrir: sales del estado con 1 HP (5 s, cancelable)",
+  },
 };
 
 export const MAGO_COOLDOWN_BASE = 15;
@@ -339,7 +344,9 @@ export function crearJuego(cfg: Config): GameState {
       120 + Math.random() * (WORLD_H - 240),
       usados,
     );
-    pickups.push({ id: nextId++, x: p.x, y: p.y, kind: i % 2 === 0 ? "botiquin" : "cola", tomado: false });
+    const ciclo: ItemKind[] =
+      cfg.modo === "sufrimiento" ? ["botiquin", "cola", "antidoto"] : ["botiquin", "cola"];
+    pickups.push({ id: nextId++, x: p.x, y: p.y, kind: ciclo[i % ciclo.length]!, tomado: false });
   }
 
   return {
@@ -578,6 +585,13 @@ export function usarHabilidad(st: GameState, e: Entity) {
 
 export function iniciarItem(st: GameState, e: Entity, kind: ItemKind) {
   if (!e.inventario[kind] || e.canalizando || !e.vivo) return;
+  // el antídoto sólo funciona mientras te arrastras; el resto, sólo en pie
+  if (kind === "antidoto") {
+    if (!e.sufriendo) {
+      if (e.isPlayer) msg(st, "El antídoto sólo se usa mientras te arrastras");
+      return;
+    }
+  } else if (e.sufriendo) return;
   const total = ITEM_INFO[kind].canal;
   e.canalizando = { tipo: kind, fin: st.t + total, total };
 }
@@ -593,6 +607,11 @@ function terminarCanal(st: GameState, e: Entity) {
   if (c.tipo === "botiquin") {
     e.hp = Math.min(e.maxHp, e.hp + 35);
     msg(st, `${e.nombre} usó un botiquín (+35 HP)`);
+  } else if (c.tipo === "antidoto") {
+    e.sufriendo = false;
+    e.revive = 0;
+    e.hp = 1;
+    msg(st, `${e.nombre} usó un antídoto y se levantó con 1 HP`);
   } else {
     e.boost = { mult: 1.5, hasta: st.t + 10 };
     msg(st, `${e.nombre} bebió cola (1.5x, 10 s)`);
@@ -897,6 +916,7 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   // quien se arrastra sólo intenta llegar hasta un compañero en pie
   if (e.sufriendo) {
     e.rol = "huir";
+    if (e.inventario.antidoto && !e.canalizando) iniciarItem(st, e, "antidoto");
     const cerca = aliados.sort(
       (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
     )[0];
@@ -1040,6 +1060,8 @@ export function step(st: GameState, dt: number, input: Input) {
       if (input.usarHabilidad) usarHabilidad(st, jugador);
       if (input.recoger) intentarRecoger(st, jugador);
       if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    } else if (input.usarItem === "antidoto") {
+      iniciarItem(st, jugador, "antidoto");
     }
 
     const corriendo = input.run && puedeCorrer(jugador);

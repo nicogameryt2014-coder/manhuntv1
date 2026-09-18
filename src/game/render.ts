@@ -85,6 +85,20 @@ export function render(
       ctx.fillStyle = "#e05b6b";
       ctx.fillRect(-2.5, -6, 5, 12);
       ctx.fillRect(-7, -2.5, 14, 5);
+    } else if (p.kind === "antidoto") {
+      ctx.fillStyle = "#8ef0c6";
+      ctx.beginPath();
+      ctx.moveTo(-5, -10);
+      ctx.lineTo(5, -10);
+      ctx.lineTo(9, 10);
+      ctx.lineTo(-9, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#2f6b52";
+      ctx.fillRect(-5, -13, 10, 4);
+      ctx.fillStyle = "#f4f6fb";
+      ctx.fillRect(-2, 0, 4, 7);
+      ctx.fillRect(-5, 2, 10, 3);
     } else {
       ctx.fillStyle = "#c1553c";
       ctx.fillRect(-7, -11, 14, 22);
