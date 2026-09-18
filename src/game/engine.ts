@@ -585,6 +585,13 @@ export function usarHabilidad(st: GameState, e: Entity) {
 
 export function iniciarItem(st: GameState, e: Entity, kind: ItemKind) {
   if (!e.inventario[kind] || e.canalizando || !e.vivo) return;
+  // el antídoto sólo funciona mientras te arrastras; el resto, sólo en pie
+  if (kind === "antidoto") {
+    if (!e.sufriendo) {
+      if (e.isPlayer) msg(st, "El antídoto sólo se usa mientras te arrastras");
+      return;
+    }
+  } else if (e.sufriendo) return;
   const total = ITEM_INFO[kind].canal;
   e.canalizando = { tipo: kind, fin: st.t + total, total };
 }
@@ -600,6 +607,11 @@ function terminarCanal(st: GameState, e: Entity) {
   if (c.tipo === "botiquin") {
     e.hp = Math.min(e.maxHp, e.hp + 35);
     msg(st, `${e.nombre} usó un botiquín (+35 HP)`);
+  } else if (c.tipo === "antidoto") {
+    e.sufriendo = false;
+    e.revive = 0;
+    e.hp = 1;
+    msg(st, `${e.nombre} usó un antídoto y se levantó con 1 HP`);
   } else {
     e.boost = { mult: 1.5, hasta: st.t + 10 };
     msg(st, `${e.nombre} bebió cola (1.5x, 10 s)`);
