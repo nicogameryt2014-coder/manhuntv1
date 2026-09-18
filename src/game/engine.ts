@@ -72,8 +72,9 @@ const SURV_RUN = 190;
 const KILL_WALK = 126;
 const KILL_RUN = SURV_RUN * 0.85;
 
-export const WORLD_W = 1600;
-export const WORLD_H = 1100;
+// área ~8x la original (antes 1600x1100)
+export const WORLD_W = 4500;
+export const WORLD_H = 3100;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -193,23 +194,34 @@ export type Input = {
 let nextId = 1;
 
 function walls(): Rect[] {
-  return [
+  const ws: Rect[] = [
     { x: 0, y: 0, w: WORLD_W, h: 24 },
     { x: 0, y: WORLD_H - 24, w: WORLD_W, h: 24 },
     { x: 0, y: 0, w: 24, h: WORLD_H },
     { x: WORLD_W - 24, y: 0, w: 24, h: WORLD_H },
-    { x: 240, y: 160, w: 260, h: 28 },
-    { x: 240, y: 160, w: 28, h: 240 },
-    { x: 640, y: 120, w: 28, h: 300 },
-    { x: 820, y: 260, w: 300, h: 28 },
-    { x: 1240, y: 140, w: 28, h: 320 },
-    { x: 380, y: 520, w: 320, h: 28 },
-    { x: 880, y: 480, w: 28, h: 300 },
-    { x: 1020, y: 620, w: 300, h: 28 },
-    { x: 200, y: 700, w: 28, h: 240 },
-    { x: 400, y: 860, w: 380, h: 28 },
-    { x: 1360, y: 700, w: 28, h: 240 },
   ];
+  // laberinto procedural: celdas con muros sueltos (a veces en esquina),
+  // dejando pasillos amplios para que el pathfinding siempre encuentre ruta
+  const pitch = 420;
+  const cols = Math.floor((WORLD_W - 240) / pitch);
+  const rows = Math.floor((WORLD_H - 240) / pitch);
+  for (let cx = 0; cx < cols; cx++) {
+    for (let cy = 0; cy < rows; cy++) {
+      if (Math.random() > 0.72) continue;
+      const bx = 120 + cx * pitch + Math.random() * (pitch - 220);
+      const by = 120 + cy * pitch + Math.random() * (pitch - 220);
+      const horizontal = Math.random() < 0.5;
+      const len = 180 + Math.random() * 200;
+      if (horizontal) ws.push({ x: bx, y: by, w: len, h: 28 });
+      else ws.push({ x: bx, y: by, w: 28, h: len });
+      if (Math.random() < 0.35) {
+        const len2 = 120 + Math.random() * 140;
+        if (horizontal) ws.push({ x: bx, y: by, w: 28, h: len2 });
+        else ws.push({ x: bx, y: by, w: len2, h: 28 });
+      }
+    }
+  }
+  return ws;
 }
 
 function nuevaEntidad(
@@ -309,14 +321,18 @@ export function crearJuego(cfg: Config): GameState {
   const ents: Entity[] = [];
   const usados: { x: number; y: number }[] = [];
 
-  const spawnSurv = spawnCerca(ws, 140, 960, usados);
+  const spawnSurv = spawnCerca(ws, 150, WORLD_H - 150, usados);
   ents.push(nuevaEntidad("Tú", "survivor", cfg.habilidad, spawnSurv.x, spawnSurv.y, true));
 
   const esquinas = [
     { x: 160, y: 140 },
-    { x: 1420, y: 180 },
-    { x: 1440, y: 960 },
-    { x: 160, y: 960 },
+    { x: WORLD_W - 160, y: 180 },
+    { x: WORLD_W - 160, y: WORLD_H - 140 },
+    { x: 160, y: WORLD_H - 140 },
+    { x: WORLD_W / 2, y: 160 },
+    { x: WORLD_W / 2, y: WORLD_H - 160 },
+    { x: 160, y: WORLD_H / 2 },
+    { x: WORLD_W - 160, y: WORLD_H / 2 },
   ];
   for (let i = 0; i < Math.max(0, cfg.sobrevivientes - 1); i++) {
     const a = SURVIVOR_ABILITIES[i % SURVIVOR_ABILITIES.length]!;
