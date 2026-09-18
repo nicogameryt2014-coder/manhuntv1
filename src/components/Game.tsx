@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
-import { Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
+import { FlaskConical, Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ABILITY_INFO,
