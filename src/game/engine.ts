@@ -916,6 +916,7 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   // quien se arrastra sólo intenta llegar hasta un compañero en pie
   if (e.sufriendo) {
     e.rol = "huir";
+    if (e.inventario.antidoto && !e.canalizando) iniciarItem(st, e, "antidoto");
     const cerca = aliados.sort(
       (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
     )[0];
@@ -1059,6 +1060,8 @@ export function step(st: GameState, dt: number, input: Input) {
       if (input.usarHabilidad) usarHabilidad(st, jugador);
       if (input.recoger) intentarRecoger(st, jugador);
       if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    } else if (input.usarItem === "antidoto") {
+      iniciarItem(st, jugador, "antidoto");
     }
 
     const corriendo = input.run && puedeCorrer(jugador);
