@@ -352,7 +352,8 @@ export function crearJuego(cfg: Config): GameState {
   }
 
   const pickups: Pickup[] = [];
-  const totalItems = Math.max(6, Math.round(cfg.sobrevivientes * 1.5));
+  // mapa mucho más grande: más objetos repartidos
+  const totalItems = Math.max(12, Math.round(cfg.sobrevivientes * 2.5));
   for (let i = 0; i < totalItems; i++) {
     const p = spawnCerca(
       ws,
