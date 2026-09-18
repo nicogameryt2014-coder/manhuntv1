@@ -108,6 +108,7 @@ export function Game() {
       if (k === "e") pulsos.current.recoger = true;
       if (k === "1") pulsos.current.item = "botiquin";
       if (k === "2") pulsos.current.item = "cola";
+      if (k === "3") pulsos.current.item = "antidoto";
       if (k === "escape") pulsos.current.cancelar = true;
       if (k === "tab" || k === "f") {
         const st = stateRef.current;
@@ -477,6 +478,7 @@ export function Game() {
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
                 <div>1 · Botiquín {hud.inventario.includes("botiquin") ? "✔" : "—"}</div>
                 <div>2 · Cola {hud.inventario.includes("cola") ? "✔" : "—"}</div>
+                <div>3 · Antídoto {hud.inventario.includes("antidoto") ? "✔" : "—"}</div>
               </div>
             </div>
 
