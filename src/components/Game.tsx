@@ -217,6 +217,8 @@ export function Game() {
         efecto(muerteAudio.url, 0.9);
       }
       if (antes === "caza" && st.fase === "escape") {
+        // la música de ronda se apaga: en el escape sólo suena la pista de escape
+        pararMusicaRonda();
         if (musicaRef.current) pista(musicaRef.current);
       }
       if (st.estado !== "jugando") {
