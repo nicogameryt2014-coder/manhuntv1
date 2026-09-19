@@ -105,6 +105,8 @@ export type Entity = {
   inventario: Partial<Record<ItemKind, boolean>>;
   ataqueListo: number;
   vivo: boolean;
+  /** llegó a la salida durante la fase de escape */
+  escapo: boolean;
   venenoArmadoHasta: number;
   // estado de sufrimiento (modo "sufrimiento")
   sufriendo: boolean;
@@ -174,6 +176,13 @@ export type GameState = {
   modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
+  /** fase de partida: caza normal o carrera hacia la salida */
+  fase: "caza" | "escape";
+  salida: { x: number; y: number; r: number } | null;
+  /** segundos que dura la fase de escape (duración de la música) */
+  duracionEscape: number;
+  tiempoEscape: number;
+  escapados: number;
   coord: Coord;
   /** id de la entidad que observa el jugador cuando ya está muerto (modo fantasma) */
   espectando: number | null;
@@ -257,6 +266,7 @@ function nuevaEntidad(
     inventario: {},
     ataqueListo: 0,
     vivo: true,
+    escapo: false,
     venenoArmadoHasta: 0,
     sufriendo: false,
     caidas: 0,
@@ -381,6 +391,11 @@ export function crearJuego(cfg: Config): GameState {
     modo: cfg.modo,
     mensajes: [],
     tiempoRestante: cfg.duracion,
+    fase: "caza",
+    salida: null,
+    duracionEscape: 60,
+    tiempoEscape: 0,
+    escapados: 0,
     coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
     espectando: null,
   };
@@ -914,6 +929,13 @@ function iaAsesino(st: GameState, e: Entity, dt: number) {
     e.objetivoId = null;
     // patrulla repartida: cada asesino barre un sector distinto del mapa
     if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60 || st.t > e.repathEn + 6) {
+      if (st.fase === "escape" && st.salida) {
+        // en el escape los asesinos custodian la salida
+        const a = (indice / Math.max(1, killers.length)) * Math.PI * 2;
+        fijarMeta(st, e, st.salida.x + Math.cos(a) * 170, st.salida.y + Math.sin(a) * 170);
+        seguirCamino(st, e, dt, true);
+        return;
+      }
       const sectores = Math.max(1, killers.length);
       const s = (indice + Math.floor(st.t / 12)) % sectores;
       const cx = 150 + ((s + 0.5) / sectores) * (WORLD_W - 300);
@@ -934,11 +956,26 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   if (e.sufriendo) {
     e.rol = "huir";
     if (e.inventario.antidoto && !e.canalizando) iniciarItem(st, e, "antidoto");
+    if (st.fase === "escape" && st.salida) {
+      fijarMeta(st, e, st.salida.x, st.salida.y, true);
+      seguirCamino(st, e, dt, false);
+      return;
+    }
     const cerca = aliados.sort(
       (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
     )[0];
     if (cerca) fijarMeta(st, e, cerca.x, cerca.y, true);
     seguirCamino(st, e, dt, false);
+    return;
+  }
+
+  // fase de escape: todo lo demás pasa a segundo plano, hay que llegar a la salida
+  if (st.fase === "escape" && st.salida) {
+    e.rol = "huir";
+    if (e.canalizando) cancelarCanal(e);
+    if (st.t >= e.cooldownHasta && e.ability === "asustadizo") usarHabilidad(st, e);
+    fijarMeta(st, e, st.salida.x, st.salida.y, true);
+    seguirCamino(st, e, dt, puedeCorrer(e));
     return;
   }
 
@@ -1049,10 +1086,43 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   intentarRecoger(st, e);
 }
 
+/** Abre la salida en un punto libre del mapa y arranca la cuenta atrás del escape. */
+export function abrirSalida(st: GameState) {
+  if (st.fase === "escape") return;
+  const jugador = st.entities.find((e) => e.isPlayer)!;
+  let mejor = { x: WORLD_W / 2, y: WORLD_H / 2 };
+  let mejorD = -1;
+  for (let i = 0; i < 400; i++) {
+    const x = 200 + Math.random() * (WORLD_W - 400);
+    const y = 200 + Math.random() * (WORLD_H - 400);
+    if (colisiona(x, y, 60, st.walls)) continue;
+    const d = Math.hypot(x - jugador.x, y - jugador.y);
+    if (d > mejorD && d < 2600) {
+      mejorD = d;
+      mejor = { x, y };
+    }
+  }
+  st.fase = "escape";
+  st.salida = { x: mejor.x, y: mejor.y, r: 52 };
+  st.tiempoEscape = st.duracionEscape;
+  st.mensajes.push({ texto: "¡Se abrió la salida! Corre hacia ella", hasta: st.t + 5 });
+  for (const e of st.entities) {
+    e.camino = [];
+    e.caminoIdx = 0;
+    e.meta = null;
+    e.repathEn = 0;
+  }
+}
+
 export function step(st: GameState, dt: number, input: Input) {
   if (st.estado !== "jugando") return;
   st.t += dt;
-  st.tiempoRestante = Math.max(0, st.tiempoRestante - dt);
+  if (st.fase === "caza") {
+    st.tiempoRestante = Math.max(0, st.tiempoRestante - dt);
+    if (st.tiempoRestante <= 0) abrirSalida(st);
+  } else {
+    st.tiempoEscape = Math.max(0, st.tiempoEscape - dt);
+  }
 
   const jugador = st.entities.find((e) => e.isPlayer)!;
 
@@ -1164,6 +1234,20 @@ export function step(st: GameState, dt: number, input: Input) {
   st.swings = st.swings.filter((s) => st.t < s.hasta);
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 
+  // fase de escape: quien toca la salida se salva
+  if (st.fase === "escape" && st.salida) {
+    for (const e of st.entities) {
+      if (e.team !== "survivor" || !e.vivo || e.escapo) continue;
+      if (Math.hypot(e.x - st.salida.x, e.y - st.salida.y) < st.salida.r + e.r) {
+        e.escapo = true;
+        e.vivo = false;
+        e.sufriendo = false;
+        st.escapados++;
+        st.mensajes.push({ texto: `${e.nombre} escapó`, hasta: st.t + 3 });
+      }
+    }
+  }
+
   const survVivos = st.entities.filter((e) => e.team === "survivor" && e.vivo);
 
   // si el jugador murió sigue la partida como fantasma, observando a los demás
@@ -1174,8 +1258,18 @@ export function step(st: GameState, dt: number, input: Input) {
     st.espectando = null;
   }
 
-  if (survVivos.length === 0) st.estado = "perdido";
-  else if (st.tiempoRestante <= 0) st.estado = jugador.vivo ? "ganado" : "perdido";
+  if (st.fase === "escape" && st.tiempoEscape <= 0) {
+    // se acabó la música: todos los que no llegaron mueren
+    for (const e of survVivos) {
+      e.vivo = false;
+      e.sufriendo = false;
+    }
+    st.estado = jugador.escapo ? "ganado" : "perdido";
+  } else if (jugador.escapo) {
+    st.estado = "ganado";
+  } else if (survVivos.length === 0) {
+    st.estado = "perdido";
+  }
 }
 
 function espectadorPorDefecto(st: GameState): number | null {

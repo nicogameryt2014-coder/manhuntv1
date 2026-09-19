@@ -16,6 +16,7 @@ import {
   SUFRIMIENTO,
 } from "@/game/engine";
 import { render } from "@/game/render";
+import sonicAudio from "@/assets/sonic.mp3.asset.json";
 
 type Fase = "menu" | "jugando";
 
@@ -35,6 +36,9 @@ type Hud = {
   peligro: number;
   fantasma: boolean;
   observando: string | null;
+  escape: boolean;
+  escapados: number;
+  escapaste: boolean;
 };
 
 type TouchMove = { x: number; y: number };
@@ -63,6 +67,8 @@ export function Game() {
   const pulsos = useRef<{ habilidad: boolean; recoger: boolean; item: ItemKind | null; cancelar: boolean }>(
     { habilidad: false, recoger: false, item: null, cancelar: false },
   );
+  const musicaRef = useRef<HTMLAudioElement | null>(null);
+  const duracionMusica = useRef(0);
   const debugRef = useRef(debug);
   const touchMove = useRef<TouchMove>({ x: 0, y: 0 });
   const touchRun = useRef(false);
@@ -82,6 +88,25 @@ export function Game() {
     [nSobrevivientes, nAsesinos, modo],
   );
 
+
+  // pista que suena al abrirse la salida; su duración marca el tiempo de escape
+  useEffect(() => {
+    const audio = new Audio(sonicAudio.url);
+    audio.preload = "auto";
+    audio.volume = 0.7;
+    const alCargar = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 1) {
+        duracionMusica.current = audio.duration;
+      }
+    };
+    audio.addEventListener("loadedmetadata", alCargar);
+    musicaRef.current = audio;
+    return () => {
+      audio.removeEventListener("loadedmetadata", alCargar);
+      audio.pause();
+      musicaRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(pointer: coarse), (max-width: 767px)");
@@ -159,7 +184,22 @@ export function Game() {
         cancelar: pulsos.current.cancelar,
       };
       pulsos.current = { habilidad: false, recoger: false, item: null, cancelar: false };
+      // la fase de escape dura exactamente lo que la pista de audio
+      if (st.fase === "caza" && duracionMusica.current > 0) {
+        st.duracionEscape = duracionMusica.current;
+      }
+      const antes = st.fase;
       step(st, dt, input);
+      if (antes === "caza" && st.fase === "escape") {
+        const a = musicaRef.current;
+        if (a) {
+          a.currentTime = 0;
+          void a.play().catch(() => {});
+        }
+      }
+      if (st.estado !== "jugando" && musicaRef.current && !musicaRef.current.paused) {
+        musicaRef.current.pause();
+      }
       render(ctx, st, vista.w, vista.h, debugRef.current);
 
       const p = st.entities.find((e) => e.isPlayer);
@@ -192,7 +232,10 @@ export function Game() {
             }
           : null,
         inventario: (Object.keys(p.inventario) as ItemKind[]).filter((i) => p.inventario[i]),
-        tiempo: Math.ceil(st.tiempoRestante),
+        tiempo: Math.ceil(st.fase === "escape" ? st.tiempoEscape : st.tiempoRestante),
+        escape: st.fase === "escape",
+        escapados: st.escapados,
+        escapaste: p.escapo,
         estado: st.estado,
         mensajes: st.mensajes.map((m) => m.texto).slice(-3),
         escudoActivo: p.escudoActivoSobre !== null,
@@ -472,9 +515,17 @@ export function Game() {
             </div>
 
             <div className="pointer-events-none absolute right-2 top-2 space-y-1 text-right sm:right-4 sm:top-4 sm:space-y-2">
-              <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-xs backdrop-blur sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm">
+              <div
+                className={`rounded-md px-2 py-1 font-mono text-xs backdrop-blur sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm ${hud.escape ? "bg-destructive/85 text-destructive-foreground" : "bg-background/80"}`}
+              >
+                {hud.escape ? "ESCAPE " : ""}
                 {Math.floor(hud.tiempo / 60)}:{String(hud.tiempo % 60).padStart(2, "0")}
               </div>
+              {hud.escape && (
+                <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-[11px] backdrop-blur sm:rounded-lg sm:px-3">
+                  {hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · {hud.escapados} fuera
+                </div>
+              )}
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
                 <div>1 · Botiquín {hud.inventario.includes("botiquin") ? "✔" : "—"}</div>
                 <div>2 · Cola {hud.inventario.includes("cola") ? "✔" : "—"}</div>
@@ -508,8 +559,17 @@ export function Game() {
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
                 <h2 className="text-3xl font-black sm:text-4xl">
-                  {hud.estado === "ganado" ? "¡Sobreviviste!" : "Te atraparon"}
+                  {hud.estado === "ganado"
+                    ? hud.escapaste
+                      ? "¡Escapaste!"
+                      : "¡Sobreviviste!"
+                    : hud.escape
+                      ? "No llegaste a la salida"
+                      : "Te atraparon"}
                 </h2>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {hud.escapados} sobreviviente(s) lograron escapar
+                </p>
                 <Button
                   onClick={() => setFase("menu")}
                   size="lg"

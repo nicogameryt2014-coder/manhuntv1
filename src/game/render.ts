@@ -132,6 +132,29 @@ export function render(
     }
   }
 
+  if (st.salida) {
+    const s = st.salida;
+    const pulso = 0.5 + 0.5 * Math.sin(st.t * 3);
+    const g = ctx.createRadialGradient(s.x, s.y, 6, s.x, s.y, s.r);
+    g.addColorStop(0, `rgba(242, 233, 160, ${0.75 + pulso * 0.25})`);
+    g.addColorStop(1, "rgba(120, 220, 160, 0.12)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 236, 130, ${0.6 + pulso * 0.4})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r + 10 + pulso * 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#151a22";
+    ctx.font = "bold 16px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("SALIDA", s.x, s.y + 5);
+  }
+
   for (const s of st.swings) {
     const cx = s.x + s.fx * 44;
     const cy = s.y + s.fy * 44;
@@ -177,7 +200,62 @@ export function render(
   ctx.restore();
 
   indicadoresBorde(ctx, st, jugador, camX, camY, vw, vh);
+  if (st.salida) indicadorSalida(ctx, st, camX, camY, vw, vh);
   if (!fantasma) efectosVidaBaja(ctx, st, jugadorReal, vw, vh);
+}
+
+/** Gran marcador en el borde apuntando hacia la salida. */
+function indicadorSalida(
+  ctx: CanvasRenderingContext2D,
+  st: GameState,
+  camX: number,
+  camY: number,
+  vw: number,
+  vh: number,
+) {
+  const s = st.salida!;
+  const sx = s.x - camX;
+  const sy = s.y - camY;
+  if (sx > 0 && sx < vw && sy > 0 && sy < vh) return;
+  const cx = vw / 2;
+  const cy = vh / 2;
+  const ang = Math.atan2(sy - cy, sx - cx);
+  const margen = 54;
+  const hw = vw / 2 - margen;
+  const hh = vh / 2 - margen;
+  const cos = Math.cos(ang);
+  const sin = Math.sin(ang);
+  const t = Math.min(Math.abs(hw / (cos || 1e-6)), Math.abs(hh / (sin || 1e-6)));
+  const px = cx + cos * t;
+  const py = cy + sin * t;
+  const pulso = 0.5 + 0.5 * Math.sin(st.t * 4);
+
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(ang);
+  ctx.fillStyle = `rgba(255, 224, 110, ${0.65 + pulso * 0.35})`;
+  ctx.beginPath();
+  ctx.moveTo(40, 0);
+  ctx.lineTo(8, -24);
+  ctx.lineTo(8, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.rotate(-ang);
+  ctx.fillStyle = "rgba(12,14,18,0.9)";
+  ctx.strokeStyle = "#ffe06e";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 26, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffe06e";
+  ctx.font = "bold 11px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("SALIDA", 0, -1);
+  const dist = Math.round(Math.hypot(s.x - (camX + vw / 2), s.y - (camY + vh / 2)) / 10);
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.fillText(`${dist} m`, 0, 12);
+  ctx.restore();
 }
 
 /** Espíritu del jugador muerto flotando junto a quien observa. */
