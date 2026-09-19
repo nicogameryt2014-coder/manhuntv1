@@ -391,6 +391,11 @@ export function crearJuego(cfg: Config): GameState {
     modo: cfg.modo,
     mensajes: [],
     tiempoRestante: cfg.duracion,
+    fase: "caza",
+    salida: null,
+    duracionEscape: 60,
+    tiempoEscape: 0,
+    escapados: 0,
     coord: { presa: null, presaX: 0, presaY: 0, presaVistaEn: -99, avisos: [], socorroId: null },
     espectando: null,
   };
