@@ -200,6 +200,7 @@ export function render(
   ctx.restore();
 
   indicadoresBorde(ctx, st, jugador, camX, camY, vw, vh);
+  if (st.salida) indicadorSalida(ctx, st, camX, camY, vw, vh);
   if (!fantasma) efectosVidaBaja(ctx, st, jugadorReal, vw, vh);
 }
 
