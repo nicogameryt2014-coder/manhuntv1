@@ -1067,7 +1067,12 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
 export function step(st: GameState, dt: number, input: Input) {
   if (st.estado !== "jugando") return;
   st.t += dt;
-  st.tiempoRestante = Math.max(0, st.tiempoRestante - dt);
+  if (st.fase === "caza") {
+    st.tiempoRestante = Math.max(0, st.tiempoRestante - dt);
+    if (st.tiempoRestante <= 0) abrirSalida(st);
+  } else {
+    st.tiempoEscape = Math.max(0, st.tiempoEscape - dt);
+  }
 
   const jugador = st.entities.find((e) => e.isPlayer)!;
 
