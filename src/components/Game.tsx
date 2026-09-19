@@ -195,7 +195,10 @@ export function Game() {
             }
           : null,
         inventario: (Object.keys(p.inventario) as ItemKind[]).filter((i) => p.inventario[i]),
-        tiempo: Math.ceil(st.tiempoRestante),
+        tiempo: Math.ceil(st.fase === "escape" ? st.tiempoEscape : st.tiempoRestante),
+        escape: st.fase === "escape",
+        escapados: st.escapados,
+        escapaste: p.escapo,
         estado: st.estado,
         mensajes: st.mensajes.map((m) => m.texto).slice(-3),
         escudoActivo: p.escudoActivoSobre !== null,
