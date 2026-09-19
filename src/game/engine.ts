@@ -4,6 +4,16 @@
 import { buscarCamino, construirGrid, lineaLibre, type Grid } from "./pathfind";
 
 export type SurvivorAbility = "medico" | "atacante" | "asustadizo" | "mago";
+
+/** Stamina: se gasta al correr y se recupera al no correr. */
+export const STAMINA = {
+  maxSobreviviente: 100,
+  maxAsesino: 140,
+  gastoSobreviviente: 20, // SP por segundo corriendo
+  gastoAsesino: 21,
+  regen: 28, // SP por segundo sin correr
+  umbralRecuperacion: 30, // si te agotas, no corres hasta llegar a esto
+};
 export type KillerAbility = "venenoso" | "ninja";
 export type ItemKind = "botiquin" | "cola" | "antidoto";
 
@@ -90,6 +100,13 @@ export type Entity = {
   r: number;
   hp: number;
   maxHp: number;
+  /** stamina: se gasta al correr */
+  sp: number;
+  maxSp: number;
+  /** sin stamina hasta recuperar un mínimo */
+  agotado: boolean;
+  /** corrió durante este tick (para gasto/regen) */
+  corrio: boolean;
   fx: number;
   fy: number;
   isPlayer: boolean;
@@ -256,6 +273,10 @@ function nuevaEntidad(
     r: 15,
     hp: 100,
     maxHp: 100,
+    sp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
+    maxSp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
+    agotado: false,
+    corrio: false,
     fx: 0,
     fy: 1,
     isPlayer,
@@ -431,7 +452,21 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 
 export function puedeCorrer(e: Entity): boolean {
   if (e.sufriendo) return false;
+  if (e.agotado || e.sp <= 0) return false;
   return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+}
+
+/** Gasto y regeneración de stamina según si corrió este tick. */
+function actualizarStamina(e: Entity, dt: number) {
+  if (e.corrio) {
+    const gasto = e.team === "killer" ? STAMINA.gastoAsesino : STAMINA.gastoSobreviviente;
+    e.sp = Math.max(0, e.sp - gasto * dt);
+    if (e.sp <= 0) e.agotado = true;
+  } else {
+    e.sp = Math.min(e.maxSp, e.sp + STAMINA.regen * dt);
+    if (e.agotado && e.sp >= STAMINA.umbralRecuperacion) e.agotado = false;
+  }
+  e.corrio = false;
 }
 
 /** Objetivo válido para un asesino: vivo y no arrastrándose. */
@@ -759,6 +794,7 @@ function seguirCamino(st: GameState, e: Entity, dt: number, corriendo: boolean):
     }
   }
   if (ang === null) return null;
+  if (corriendo) e.corrio = true;
 
   // separación suave de compañeros para que no se amontonen
   let sx = 0;
@@ -1242,6 +1278,7 @@ export function step(st: GameState, dt: number, input: Input) {
     }
 
     const corriendo = input.run && puedeCorrer(jugador);
+    if (corriendo && moviendo) jugador.corrio = true;
     const v = velocidad(jugador, st, corriendo) * dt;
     if (moviendo && v > 0) mover(jugador, dx * v, dy * v, st);
     if (jugador.canalizando && st.t >= jugador.canalizando.fin) terminarCanal(st, jugador);
@@ -1266,6 +1303,7 @@ export function step(st: GameState, dt: number, input: Input) {
 
   for (const e of st.entities) {
     if (!e.vivo) continue;
+    actualizarStamina(e, dt);
     if (e.veneno) {
       if (st.t >= e.veneno.sig) {
         danar(st, e, 0.5);

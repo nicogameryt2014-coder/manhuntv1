@@ -27,6 +27,9 @@ type Fase = "menu" | "jugando";
 
 type Hud = {
   hp: number;
+  sp: number;
+  spFrac: number;
+  agotado: boolean;
   escudo: number;
   cooldown: number;
   cooldownTotal: number;
@@ -255,6 +258,9 @@ export function Game() {
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         peligro,
         hp: Math.max(0, Math.round(p.hp)),
+        sp: Math.round(p.sp),
+        spFrac: Math.max(0, Math.min(1, p.sp / p.maxSp)),
+        agotado: p.agotado,
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
         cooldownTotal: p.cooldownTotal,
@@ -504,6 +510,17 @@ export function Game() {
                     className={`h-2 rounded transition-[width] ${hud.sufriendo ? "bg-destructive" : "bg-primary"}`}
                     style={{ width: `${hud.hp}%` }}
                   />
+                </div>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <div className="h-1.5 flex-1 rounded bg-white/10">
+                    <div
+                      className={`h-1.5 rounded transition-[width] ${hud.agotado ? "bg-destructive" : "bg-green-500"}`}
+                      style={{ width: `${hud.spFrac * 100}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {hud.agotado ? "¡Sin stamina!" : `${hud.sp} SP`}
+                  </span>
                 </div>
                 {hud.sufriendo && (
                   <>
