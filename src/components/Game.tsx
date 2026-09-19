@@ -66,6 +66,8 @@ export function Game() {
   const pulsos = useRef<{ habilidad: boolean; recoger: boolean; item: ItemKind | null; cancelar: boolean }>(
     { habilidad: false, recoger: false, item: null, cancelar: false },
   );
+  const musicaRef = useRef<HTMLAudioElement | null>(null);
+  const duracionMusica = useRef(0);
   const debugRef = useRef(debug);
   const touchMove = useRef<TouchMove>({ x: 0, y: 0 });
   const touchRun = useRef(false);
