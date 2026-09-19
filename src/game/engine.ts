@@ -105,6 +105,8 @@ export type Entity = {
   inventario: Partial<Record<ItemKind, boolean>>;
   ataqueListo: number;
   vivo: boolean;
+  /** llegó a la salida durante la fase de escape */
+  escapo: boolean;
   venenoArmadoHasta: number;
   // estado de sufrimiento (modo "sufrimiento")
   sufriendo: boolean;
