@@ -1021,14 +1021,34 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
     return;
   }
 
+  // conciencia de su propia salud: cuanto menos vida, más cauto
+  const vidaFrac = Math.max(0, Math.min(1, e.hp / e.maxHp));
+  const debil = vidaFrac < 0.55 || (e.caidas > 0 && vidaFrac < 0.75);
+  const critico = vidaFrac < 0.3;
+
+  // charco curativo cercano: si está herido, va a curarse antes que nada
+  let charco: Puddle | null = null;
+  let dCharco = Infinity;
+  if (vidaFrac < 0.9) {
+    for (const p of st.puddles) {
+      if (p.hasta <= st.t) continue;
+      const d = Math.hypot(p.x - e.x, p.y - e.y);
+      if (d < dCharco) {
+        dCharco = d;
+        charco = p;
+      }
+    }
+  }
+
   // reanimar a un compañero caído tiene prioridad si no hay un asesino encima
   const caido = st.entities
     .filter((o) => o.team === "survivor" && o.vivo && o.sufriendo)
     .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
-  if (caido) {
+  if (caido && !critico) {
     const dCaido = Math.hypot(caido.x - e.x, caido.y - e.y);
-    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < 150);
-    if (dCaido < 760 && !asesinoCerca) {
+    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < (debil ? 260 : 150));
+    const alcance = debil ? 320 : 760;
+    if (dCaido < alcance && !asesinoCerca) {
       e.rol = "rescatar";
       if (dCaido > SUFRIMIENTO.radioRevivir * 0.6) {
         fijarMeta(st, e, caido.x, caido.y, true);
