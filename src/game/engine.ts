@@ -176,6 +176,13 @@ export type GameState = {
   modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   tiempoRestante: number;
+  /** fase de partida: caza normal o carrera hacia la salida */
+  fase: "caza" | "escape";
+  salida: { x: number; y: number; r: number } | null;
+  /** segundos que dura la fase de escape (duración de la música) */
+  duracionEscape: number;
+  tiempoEscape: number;
+  escapados: number;
   coord: Coord;
   /** id de la entidad que observa el jugador cuando ya está muerto (modo fantasma) */
   espectando: number | null;
