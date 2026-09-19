@@ -1212,6 +1212,20 @@ export function step(st: GameState, dt: number, input: Input) {
   st.swings = st.swings.filter((s) => st.t < s.hasta);
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 
+  // fase de escape: quien toca la salida se salva
+  if (st.fase === "escape" && st.salida) {
+    for (const e of st.entities) {
+      if (e.team !== "survivor" || !e.vivo || e.escapo) continue;
+      if (Math.hypot(e.x - st.salida.x, e.y - st.salida.y) < st.salida.r + e.r) {
+        e.escapo = true;
+        e.vivo = false;
+        e.sufriendo = false;
+        st.escapados++;
+        st.mensajes.push({ texto: `${e.nombre} escapó`, hasta: st.t + 3 });
+      }
+    }
+  }
+
   const survVivos = st.entities.filter((e) => e.team === "survivor" && e.vivo);
 
   // si el jugador murió sigue la partida como fantasma, observando a los demás
@@ -1222,8 +1236,18 @@ export function step(st: GameState, dt: number, input: Input) {
     st.espectando = null;
   }
 
-  if (survVivos.length === 0) st.estado = "perdido";
-  else if (st.tiempoRestante <= 0) st.estado = jugador.vivo ? "ganado" : "perdido";
+  if (st.fase === "escape" && st.tiempoEscape <= 0) {
+    // se acabó la música: todos los que no llegaron mueren
+    for (const e of survVivos) {
+      e.vivo = false;
+      e.sufriendo = false;
+    }
+    st.estado = jugador.escapo ? "ganado" : "perdido";
+  } else if (jugador.escapo) {
+    st.estado = "ganado";
+  } else if (survVivos.length === 0) {
+    st.estado = "perdido";
+  }
 }
 
 function espectadorPorDefecto(st: GameState): number | null {
