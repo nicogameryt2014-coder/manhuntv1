@@ -176,6 +176,8 @@ export type GameState = {
   modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   muertes: { id: number; t: number }[];
+  /** golpes recibidos por sobrevivientes (sonido de impacto) */
+  golpes: { id: number; t: number }[];
   tiempoRestante: number;
   /** fase de partida: caza normal o carrera hacia la salida */
   fase: "caza" | "escape";
@@ -392,6 +394,7 @@ export function crearJuego(cfg: Config): GameState {
     modo: cfg.modo,
     mensajes: [],
     muertes: [],
+    golpes: [],
     tiempoRestante: cfg.duracion,
     fase: "caza",
     salida: null,
@@ -672,6 +675,7 @@ export function intentarRecoger(st: GameState, e: Entity) {
 }
 
 function golpeAsesino(st: GameState, k: Entity, objetivo: Entity) {
+  if (!objetivo.sufriendo) st.golpes.push({ id: objetivo.id, t: st.t });
   danar(st, objetivo, 20);
   if (k.ability === "venenoso" && st.t < k.venenoArmadoHasta) {
     objetivo.veneno = { hasta: st.t + 6, sig: st.t + 1 };
@@ -1209,6 +1213,7 @@ export function step(st: GameState, dt: number, input: Input) {
     for (const e of st.entities) {
       if (!atacable(e) || e.team !== "survivor") continue;
       if (Math.hypot(e.x - k.x, e.y - k.y) < e.r + 5) {
+        if (!e.sufriendo) st.golpes.push({ id: e.id, t: st.t });
         danar(st, e, 25);
         k.vivo = false;
         break;

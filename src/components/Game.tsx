@@ -18,6 +18,7 @@ import {
 import { render } from "@/game/render";
 import sonicAudio from "@/assets/sonic.mp3.asset.json";
 import muerteAudio from "@/assets/muerte.mp3.asset.json";
+import golpeAudio from "@/assets/golpe.mp3.asset.json";
 
 type Fase = "menu" | "jugando";
 
@@ -71,6 +72,7 @@ export function Game() {
   const musicaRef = useRef<HTMLAudioElement | null>(null);
   const duracionMusica = useRef(0);
   const muertesVistas = useRef(0);
+  const golpesVistos = useRef(0);
   const debugRef = useRef(debug);
   const touchMove = useRef<TouchMove>({ x: 0, y: 0 });
   const touchRun = useRef(false);
@@ -79,6 +81,7 @@ export function Game() {
   const iniciar = useCallback(
     (a: SurvivorAbility) => {
       muertesVistas.current = 0;
+      golpesVistos.current = 0;
       stateRef.current = crearJuego({
         habilidad: a,
         sobrevivientes: nSobrevivientes,
@@ -193,6 +196,13 @@ export function Game() {
       }
       const antes = st.fase;
       step(st, dt, input);
+      // suena el efecto por cada golpe de asesino nuevo
+      if (st.golpes.length > golpesVistos.current) {
+        golpesVistos.current = st.golpes.length;
+        const g = new Audio(golpeAudio.url);
+        g.volume = 0.8;
+        void g.play().catch(() => {});
+      }
       // suena el efecto por cada muerte definitiva nueva
       if (st.muertes.length > muertesVistas.current) {
         muertesVistas.current = st.muertes.length;
