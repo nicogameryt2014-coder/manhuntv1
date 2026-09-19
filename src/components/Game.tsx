@@ -84,6 +84,7 @@ export function Game() {
     (a: SurvivorAbility) => {
       muertesVistas.current = 0;
       golpesVistos.current = 0;
+      iniciarMusicaRonda(rondaAudio.url);
       stateRef.current = crearJuego({
         habilidad: a,
         sobrevivientes: nSobrevivientes,
