@@ -18,6 +18,7 @@ import {
 import { render } from "@/game/render";
 import sonicAudio from "@/assets/sonic.mp3.asset.json";
 import muerteAudio from "@/assets/muerte.mp3.asset.json";
+import golpeAudio from "@/assets/golpe.mp3.asset.json";
 
 type Fase = "menu" | "jugando";
 
@@ -71,6 +72,7 @@ export function Game() {
   const musicaRef = useRef<HTMLAudioElement | null>(null);
   const duracionMusica = useRef(0);
   const muertesVistas = useRef(0);
+  const golpesVistos = useRef(0);
   const debugRef = useRef(debug);
   const touchMove = useRef<TouchMove>({ x: 0, y: 0 });
   const touchRun = useRef(false);
