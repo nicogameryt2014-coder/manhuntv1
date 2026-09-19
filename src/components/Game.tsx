@@ -221,6 +221,14 @@ export function Game() {
       const p = st.entities.find((e) => e.isPlayer);
       if (!p) return;
       const vidaFrac = Math.max(0, Math.min(1, p.hp / p.maxHp));
+      // la mezcla se apaga/ralentiza/hace eco con poca vida; latidos tras revivir
+      if (st.estado === "jugando") {
+        actualizarAudio({
+          vidaFrac: p.vivo ? (p.sufriendo ? 0.15 : vidaFrac) : 1,
+          latidos: p.vivo && !p.sufriendo && p.caidas > 0,
+          dt,
+        });
+      }
       const gris = !p.vivo || p.sufriendo ? 1 : Math.max(0, 1 - vidaFrac / 0.7);
       const peligro = p.sufriendo && p.vivo ? 1 - vidaFrac : 0;
       const brillo = 1 - peligro * 0.45;
