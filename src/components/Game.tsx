@@ -88,6 +88,25 @@ export function Game() {
   );
 
 
+  // pista que suena al abrirse la salida; su duración marca el tiempo de escape
+  useEffect(() => {
+    const audio = new Audio(sonicAudio.url);
+    audio.preload = "auto";
+    audio.volume = 0.7;
+    const alCargar = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 1) {
+        duracionMusica.current = audio.duration;
+      }
+    };
+    audio.addEventListener("loadedmetadata", alCargar);
+    musicaRef.current = audio;
+    return () => {
+      audio.removeEventListener("loadedmetadata", alCargar);
+      audio.pause();
+      musicaRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     const query = window.matchMedia("(pointer: coarse), (max-width: 767px)");
     const actualizar = () => {
