@@ -929,6 +929,13 @@ function iaAsesino(st: GameState, e: Entity, dt: number) {
     e.objetivoId = null;
     // patrulla repartida: cada asesino barre un sector distinto del mapa
     if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60 || st.t > e.repathEn + 6) {
+      if (st.fase === "escape" && st.salida) {
+        // en el escape los asesinos custodian la salida
+        const a = (indice / Math.max(1, killers.length)) * Math.PI * 2;
+        fijarMeta(st, e, st.salida.x + Math.cos(a) * 170, st.salida.y + Math.sin(a) * 170);
+        seguirCamino(st, e, dt, true);
+        return;
+      }
       const sectores = Math.max(1, killers.length);
       const s = (indice + Math.floor(st.t / 12)) % sectores;
       const cx = 150 + ((s + 0.5) / sectores) * (WORLD_W - 300);
