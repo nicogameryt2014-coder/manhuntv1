@@ -1303,6 +1303,7 @@ export function step(st: GameState, dt: number, input: Input) {
 
   for (const e of st.entities) {
     if (!e.vivo) continue;
+    actualizarStamina(e, dt);
     if (e.veneno) {
       if (st.t >= e.veneno.sig) {
         danar(st, e, 0.5);
