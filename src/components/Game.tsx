@@ -515,9 +515,17 @@ export function Game() {
             </div>
 
             <div className="pointer-events-none absolute right-2 top-2 space-y-1 text-right sm:right-4 sm:top-4 sm:space-y-2">
-              <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-xs backdrop-blur sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm">
+              <div
+                className={`rounded-md px-2 py-1 font-mono text-xs backdrop-blur sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm ${hud.escape ? "bg-destructive/85 text-destructive-foreground" : "bg-background/80"}`}
+              >
+                {hud.escape ? "ESCAPE " : ""}
                 {Math.floor(hud.tiempo / 60)}:{String(hud.tiempo % 60).padStart(2, "0")}
               </div>
+              {hud.escape && (
+                <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-[11px] backdrop-blur sm:rounded-lg sm:px-3">
+                  {hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · {hud.escapados} fuera
+                </div>
+              )}
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
                 <div>1 · Botiquín {hud.inventario.includes("botiquin") ? "✔" : "—"}</div>
                 <div>2 · Cola {hud.inventario.includes("cola") ? "✔" : "—"}</div>
