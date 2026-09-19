@@ -16,6 +16,7 @@ import {
   SUFRIMIENTO,
 } from "@/game/engine";
 import { render } from "@/game/render";
+import sonicAudio from "@/assets/sonic.mp3.asset.json";
 
 type Fase = "menu" | "jugando";
 
