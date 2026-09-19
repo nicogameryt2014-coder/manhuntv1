@@ -27,6 +27,9 @@ type Fase = "menu" | "jugando";
 
 type Hud = {
   hp: number;
+  sp: number;
+  spFrac: number;
+  agotado: boolean;
   escudo: number;
   cooldown: number;
   cooldownTotal: number;
@@ -255,6 +258,9 @@ export function Game() {
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         peligro,
         hp: Math.max(0, Math.round(p.hp)),
+        sp: Math.round(p.sp),
+        spFrac: Math.max(0, Math.min(1, p.sp / p.maxSp)),
+        agotado: p.agotado,
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
         cooldownTotal: p.cooldownTotal,
