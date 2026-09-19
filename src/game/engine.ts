@@ -969,6 +969,16 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
     return;
   }
 
+  // fase de escape: todo lo demás pasa a segundo plano, hay que llegar a la salida
+  if (st.fase === "escape" && st.salida) {
+    e.rol = "huir";
+    if (e.canalizando) cancelarCanal(e);
+    if (st.t >= e.cooldownHasta && e.ability === "asustadizo") usarHabilidad(st, e);
+    fijarMeta(st, e, st.salida.x, st.salida.y, true);
+    seguirCamino(st, e, dt, puedeCorrer(e));
+    return;
+  }
+
   // reanimar a un compañero caído tiene prioridad si no hay un asesino encima
   const caido = st.entities
     .filter((o) => o.team === "survivor" && o.vivo && o.sufriendo)
