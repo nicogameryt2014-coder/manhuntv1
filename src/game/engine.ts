@@ -794,6 +794,7 @@ function seguirCamino(st: GameState, e: Entity, dt: number, corriendo: boolean):
     }
   }
   if (ang === null) return null;
+  if (corriendo) e.corrio = true;
 
   // separación suave de compañeros para que no se amontonen
   let sx = 0;
@@ -1277,6 +1278,7 @@ export function step(st: GameState, dt: number, input: Input) {
     }
 
     const corriendo = input.run && puedeCorrer(jugador);
+    if (corriendo && moviendo) jugador.corrio = true;
     const v = velocidad(jugador, st, corriendo) * dt;
     if (moviendo && v > 0) mover(jugador, dx * v, dy * v, st);
     if (jugador.canalizando && st.t >= jugador.canalizando.fin) terminarCanal(st, jugador);
