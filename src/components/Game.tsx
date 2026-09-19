@@ -7,6 +7,7 @@ import {
   SURVIVOR_ABILITIES,
   crearJuego,
   cambiarEspectado,
+  focoCamara,
   step,
   type GameState,
   type Input,
