@@ -175,6 +175,7 @@ export type GameState = {
   sangre: Blood[];
   modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
+  muertes: { id: number; t: number }[];
   tiempoRestante: number;
   /** fase de partida: caza normal o carrera hacia la salida */
   fase: "caza" | "escape";
@@ -390,6 +391,7 @@ export function crearJuego(cfg: Config): GameState {
     sangre: [],
     modo: cfg.modo,
     mensajes: [],
+    muertes: [],
     tiempoRestante: cfg.duracion,
     fase: "caza",
     salida: null,
@@ -466,6 +468,7 @@ function abatir(st: GameState, e: Entity) {
   }
   e.sufriendo = false;
   e.vivo = false;
+  st.muertes.push({ id: e.id, t: st.t });
   msg(st, `${e.nombre} ha caído`);
 }
 
@@ -490,6 +493,7 @@ function actualizarSufrimiento(st: GameState, dt: number) {
         e.hp = 0;
         e.sufriendo = false;
         e.vivo = false;
+        st.muertes.push({ id: e.id, t: st.t });
         msg(st, `${e.nombre} murió desangrado`);
         continue;
       }
@@ -1263,6 +1267,7 @@ export function step(st: GameState, dt: number, input: Input) {
     for (const e of survVivos) {
       e.vivo = false;
       e.sufriendo = false;
+      st.muertes.push({ id: e.id, t: st.t });
     }
     st.estado = jugador.escapo ? "ganado" : "perdido";
   } else if (jugador.escapo) {
