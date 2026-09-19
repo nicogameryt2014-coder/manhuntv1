@@ -19,6 +19,8 @@ import { render } from "@/game/render";
 import sonicAudio from "@/assets/sonic.mp3.asset.json";
 import muerteAudio from "@/assets/muerte.mp3.asset.json";
 import golpeAudio from "@/assets/golpe.mp3.asset.json";
+import rondaAudio from "@/assets/ronda.mp3.asset.json";
+import { actualizarAudio, efecto, iniciarMusicaRonda, pararMusicaRonda, pista } from "@/game/audio";
 
 type Fase = "menu" | "jugando";
 
