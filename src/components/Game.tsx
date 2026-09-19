@@ -81,6 +81,7 @@ export function Game() {
   const iniciar = useCallback(
     (a: SurvivorAbility) => {
       muertesVistas.current = 0;
+      golpesVistos.current = 0;
       stateRef.current = crearJuego({
         habilidad: a,
         sobrevivientes: nSobrevivientes,
@@ -195,6 +196,13 @@ export function Game() {
       }
       const antes = st.fase;
       step(st, dt, input);
+      // suena el efecto por cada golpe de asesino nuevo
+      if (st.golpes.length > golpesVistos.current) {
+        golpesVistos.current = st.golpes.length;
+        const g = new Audio(golpeAudio.url);
+        g.volume = 0.8;
+        void g.play().catch(() => {});
+      }
       // suena el efecto por cada muerte definitiva nueva
       if (st.muertes.length > muertesVistas.current) {
         muertesVistas.current = st.muertes.length;
