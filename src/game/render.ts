@@ -132,6 +132,29 @@ export function render(
     }
   }
 
+  if (st.salida) {
+    const s = st.salida;
+    const pulso = 0.5 + 0.5 * Math.sin(st.t * 3);
+    const g = ctx.createRadialGradient(s.x, s.y, 6, s.x, s.y, s.r);
+    g.addColorStop(0, `rgba(242, 233, 160, ${0.75 + pulso * 0.25})`);
+    g.addColorStop(1, "rgba(120, 220, 160, 0.12)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 236, 130, ${0.6 + pulso * 0.4})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r + 10 + pulso * 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#151a22";
+    ctx.font = "bold 16px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("SALIDA", s.x, s.y + 5);
+  }
+
   for (const s of st.swings) {
     const cx = s.x + s.fx * 44;
     const cy = s.y + s.fy * 44;
