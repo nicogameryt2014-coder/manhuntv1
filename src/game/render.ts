@@ -204,6 +204,60 @@ export function render(
   if (!fantasma) efectosVidaBaja(ctx, st, jugadorReal, vw, vh);
 }
 
+/** Gran marcador en el borde apuntando hacia la salida. */
+function indicadorSalida(
+  ctx: CanvasRenderingContext2D,
+  st: GameState,
+  camX: number,
+  camY: number,
+  vw: number,
+  vh: number,
+) {
+  const s = st.salida!;
+  const sx = s.x - camX;
+  const sy = s.y - camY;
+  if (sx > 0 && sx < vw && sy > 0 && sy < vh) return;
+  const cx = vw / 2;
+  const cy = vh / 2;
+  const ang = Math.atan2(sy - cy, sx - cx);
+  const margen = 54;
+  const hw = vw / 2 - margen;
+  const hh = vh / 2 - margen;
+  const cos = Math.cos(ang);
+  const sin = Math.sin(ang);
+  const t = Math.min(Math.abs(hw / (cos || 1e-6)), Math.abs(hh / (sin || 1e-6)));
+  const px = cx + cos * t;
+  const py = cy + sin * t;
+  const pulso = 0.5 + 0.5 * Math.sin(st.t * 4);
+
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(ang);
+  ctx.fillStyle = `rgba(255, 224, 110, ${0.65 + pulso * 0.35})`;
+  ctx.beginPath();
+  ctx.moveTo(40, 0);
+  ctx.lineTo(8, -24);
+  ctx.lineTo(8, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.rotate(-ang);
+  ctx.fillStyle = "rgba(12,14,18,0.9)";
+  ctx.strokeStyle = "#ffe06e";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 26, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffe06e";
+  ctx.font = "bold 11px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("SALIDA", 0, -1);
+  const dist = Math.round(Math.hypot(s.x - (camX + vw / 2), s.y - (camY + vh / 2)) / 10);
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.fillText(`${dist} m`, 0, 12);
+  ctx.restore();
+}
+
 /** Espíritu del jugador muerto flotando junto a quien observa. */
 function dibujarFantasma(ctx: CanvasRenderingContext2D, st: GameState, foco: Entity) {
   const x = foco.x - 30;
