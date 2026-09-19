@@ -1021,14 +1021,34 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
     return;
   }
 
+  // conciencia de su propia salud: cuanto menos vida, más cauto
+  const vidaFrac = Math.max(0, Math.min(1, e.hp / e.maxHp));
+  const debil = vidaFrac < 0.55 || (e.caidas > 0 && vidaFrac < 0.75);
+  const critico = vidaFrac < 0.3;
+
+  // charco curativo cercano: si está herido, va a curarse antes que nada
+  let charco: Puddle | null = null;
+  let dCharco = Infinity;
+  if (vidaFrac < 0.9) {
+    for (const p of st.puddles) {
+      if (p.hasta <= st.t) continue;
+      const d = Math.hypot(p.x - e.x, p.y - e.y);
+      if (d < dCharco) {
+        dCharco = d;
+        charco = p;
+      }
+    }
+  }
+
   // reanimar a un compañero caído tiene prioridad si no hay un asesino encima
   const caido = st.entities
     .filter((o) => o.team === "survivor" && o.vivo && o.sufriendo)
     .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
-  if (caido) {
+  if (caido && !critico) {
     const dCaido = Math.hypot(caido.x - e.x, caido.y - e.y);
-    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < 150);
-    if (dCaido < 760 && !asesinoCerca) {
+    const asesinoCerca = killers.some((k) => Math.hypot(k.x - caido.x, k.y - caido.y) < (debil ? 260 : 150));
+    const alcance = debil ? 320 : 760;
+    if (dCaido < alcance && !asesinoCerca) {
       e.rol = "rescatar";
       if (dCaido > SUFRIMIENTO.radioRevivir * 0.6) {
         fijarMeta(st, e, caido.x, caido.y, true);
@@ -1052,7 +1072,9 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   }
 
   const socorro = aliados.find((a) => a.id === st.coord.socorroId) ?? null;
-  const peligro = !!amenaza && amenaza.d < 330;
+  // los heridos detectan el peligro antes y guardan más distancia
+  const radioPeligro = critico ? 520 : debil ? 430 : 330;
+  const peligro = !!amenaza && amenaza.d < radioPeligro;
 
   // ---- habilidades coordinadas
   if (st.t >= e.cooldownHasta) {
@@ -1068,16 +1090,19 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
       const aliadoEnPeligro = socorro && Math.hypot(socorro.x - e.x, socorro.y - e.y) < 240;
       if (aliadoEnPeligro || (peligro && amenaza!.d < 180)) usarHabilidad(st, e);
     } else if (e.ability === "asustadizo") {
-      if (peligro && amenaza!.d < 210) usarHabilidad(st, e);
+      if (peligro && (amenaza!.d < 210 || debil)) usarHabilidad(st, e);
     } else if (e.ability === "medico") {
-      const herido = [e, ...aliados].find((a) => a.hp < 70 && Math.hypot(a.x - e.x, a.y - e.y) < 90);
-      if (herido) usarHabilidad(st, e);
+      // se cura a sí mismo o a cualquier aliado herido que tenga cerca
+      const herido = [e, ...aliados].find(
+        (a) => a.hp < a.maxHp * 0.85 && Math.hypot(a.x - e.x, a.y - e.y) < 160,
+      );
+      if (herido && (!charco || dCharco > 200)) usarHabilidad(st, e);
     }
   }
   // objetos: se usan a cubierto
   if (!peligro && !e.canalizando) {
-    if (e.inventario.botiquin && e.hp < 65) iniciarItem(st, e, "botiquin");
-    else if (e.inventario.cola && !e.boost) iniciarItem(st, e, "cola");
+    if (e.inventario.botiquin && vidaFrac < 0.7) iniciarItem(st, e, "botiquin");
+    else if (e.inventario.cola && !e.boost && !debil) iniciarItem(st, e, "cola");
   }
   if (e.canalizando && peligro) cancelarCanal(e);
 
@@ -1088,13 +1113,36 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
     const seguro = puntoSeguro(st, e, killers);
     if (seguro) fijarMeta(st, e, seguro.x, seguro.y, true);
     corriendo = puedeCorrer(e);
+  } else if (charco && vidaFrac < 0.9 && dCharco < 900) {
+    // curarse en el charco del médico antes que cualquier otra cosa
+    e.rol = "apoyar";
+    fijarMeta(st, e, charco.x, charco.y, true);
+    corriendo = dCharco > 150 && puedeCorrer(e);
   } else if (
     socorro &&
+    !debil &&
     (e.ability === "atacante" || e.ability === "medico" || e.ability === "mago") &&
     Math.hypot(socorro.x - e.x, socorro.y - e.y) < 650
   ) {
     e.rol = e.ability === "atacante" ? "rescatar" : "apoyar";
     fijarMeta(st, e, socorro.x, socorro.y, true);
+    corriendo = puedeCorrer(e);
+  } else if (debil) {
+    // herido: se aleja de los asesinos conocidos y se agrupa lejos del peligro
+    e.rol = "huir";
+    const seguro = puntoSeguro(st, e, killers);
+    if (seguro) fijarMeta(st, e, seguro.x, seguro.y, true);
+    else if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60) {
+      fijarMeta(st, e, 80 + Math.random() * (WORLD_W - 160), 80 + Math.random() * (WORLD_H - 160));
+    }
+    // aún así recoge un botiquín que tenga a mano
+    const boti = st.pickups.find(
+      (p) => !p.tomado && p.kind === "botiquin" && !e.inventario.botiquin && Math.hypot(p.x - e.x, p.y - e.y) < 420,
+    );
+    if (boti) {
+      e.rol = "buscar";
+      fijarMeta(st, e, boti.x, boti.y, true);
+    }
     corriendo = puedeCorrer(e);
   } else {
     // buscar objetos que le falten, si no agruparse con el compañero más cercano
