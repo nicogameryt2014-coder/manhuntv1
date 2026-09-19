@@ -1072,7 +1072,9 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   }
 
   const socorro = aliados.find((a) => a.id === st.coord.socorroId) ?? null;
-  const peligro = !!amenaza && amenaza.d < 330;
+  // los heridos detectan el peligro antes y guardan más distancia
+  const radioPeligro = critico ? 520 : debil ? 430 : 330;
+  const peligro = !!amenaza && amenaza.d < radioPeligro;
 
   // ---- habilidades coordinadas
   if (st.t >= e.cooldownHasta) {
@@ -1088,16 +1090,19 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
       const aliadoEnPeligro = socorro && Math.hypot(socorro.x - e.x, socorro.y - e.y) < 240;
       if (aliadoEnPeligro || (peligro && amenaza!.d < 180)) usarHabilidad(st, e);
     } else if (e.ability === "asustadizo") {
-      if (peligro && amenaza!.d < 210) usarHabilidad(st, e);
+      if (peligro && (amenaza!.d < 210 || debil)) usarHabilidad(st, e);
     } else if (e.ability === "medico") {
-      const herido = [e, ...aliados].find((a) => a.hp < 70 && Math.hypot(a.x - e.x, a.y - e.y) < 90);
-      if (herido) usarHabilidad(st, e);
+      // se cura a sí mismo o a cualquier aliado herido que tenga cerca
+      const herido = [e, ...aliados].find(
+        (a) => a.hp < a.maxHp * 0.85 && Math.hypot(a.x - e.x, a.y - e.y) < 160,
+      );
+      if (herido && (!charco || dCharco > 200)) usarHabilidad(st, e);
     }
   }
   // objetos: se usan a cubierto
   if (!peligro && !e.canalizando) {
-    if (e.inventario.botiquin && e.hp < 65) iniciarItem(st, e, "botiquin");
-    else if (e.inventario.cola && !e.boost) iniciarItem(st, e, "cola");
+    if (e.inventario.botiquin && vidaFrac < 0.7) iniciarItem(st, e, "botiquin");
+    else if (e.inventario.cola && !e.boost && !debil) iniciarItem(st, e, "cola");
   }
   if (e.canalizando && peligro) cancelarCanal(e);
 
