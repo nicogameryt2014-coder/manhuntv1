@@ -259,6 +259,7 @@ function nuevaEntidad(
     inventario: {},
     ataqueListo: 0,
     vivo: true,
+    escapo: false,
     venenoArmadoHasta: 0,
     sufriendo: false,
     caidas: 0,
