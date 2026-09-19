@@ -559,8 +559,17 @@ export function Game() {
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
                 <h2 className="text-3xl font-black sm:text-4xl">
-                  {hud.estado === "ganado" ? "¡Sobreviviste!" : "Te atraparon"}
+                  {hud.estado === "ganado"
+                    ? hud.escapaste
+                      ? "¡Escapaste!"
+                      : "¡Sobreviviste!"
+                    : hud.escape
+                      ? "No llegaste a la salida"
+                      : "Te atraparon"}
                 </h2>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {hud.escapados} sobreviviente(s) lograron escapar
+                </p>
                 <Button
                   onClick={() => setFase("menu")}
                   size="lg"
