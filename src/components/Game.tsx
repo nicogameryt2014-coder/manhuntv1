@@ -518,8 +518,8 @@ export function Game() {
                       style={{ width: `${hud.spFrac * 100}%` }}
                     />
                   </div>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {hud.agotado ? "¡Sin stamina!" : `${hud.sp} SP`}
+                  <span className="w-[4.5rem] shrink-0 text-right font-mono text-[10px] text-muted-foreground">
+                    {hud.agotado ? "¡Agotado!" : `${hud.sp} SP`}
                   </span>
                 </div>
                 {hud.sufriendo && (
