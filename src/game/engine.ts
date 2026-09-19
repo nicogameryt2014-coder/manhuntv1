@@ -22,7 +22,7 @@ export const ABILITY_INFO: Record<
   medico: {
     nombre: "Médico",
     cooldown: 15,
-    desc: "Lanza un charco curativo (3 s). +3 HP/s, o +6 HP/s si el médico tiene más de 40 HP.",
+    desc: "Lanza un charco curativo gigante (6 s). +6 HP/s, o +12 HP/s si el médico tiene más de 40 HP.",
   },
   atacante: {
     nombre: "Atacante",
@@ -581,8 +581,8 @@ export function usarHabilidad(st: GameState, e: Entity) {
 
   switch (e.ability) {
     case "medico": {
-      const curacion = e.hp > 40 ? 6 : 3;
-      st.puddles.push({ x: e.x + e.fx * 46, y: e.y + e.fy * 46, r: 52, hasta: st.t + 3, curacion });
+      const curacion = e.hp > 40 ? 12 : 6;
+      st.puddles.push({ x: e.x + e.fx * 46, y: e.y + e.fy * 46, r: 90, hasta: st.t + 6, curacion });
       break;
     }
     case "atacante": {
