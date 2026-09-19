@@ -956,6 +956,11 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   if (e.sufriendo) {
     e.rol = "huir";
     if (e.inventario.antidoto && !e.canalizando) iniciarItem(st, e, "antidoto");
+    if (st.fase === "escape" && st.salida) {
+      fijarMeta(st, e, st.salida.x, st.salida.y, true);
+      seguirCamino(st, e, dt, false);
+      return;
+    }
     const cerca = aliados.sort(
       (a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y),
     )[0];
