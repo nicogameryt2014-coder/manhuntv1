@@ -1064,6 +1064,34 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
   intentarRecoger(st, e);
 }
 
+/** Abre la salida en un punto libre del mapa y arranca la cuenta atrás del escape. */
+export function abrirSalida(st: GameState) {
+  if (st.fase === "escape") return;
+  const jugador = st.entities.find((e) => e.isPlayer)!;
+  let mejor = { x: WORLD_W / 2, y: WORLD_H / 2 };
+  let mejorD = -1;
+  for (let i = 0; i < 400; i++) {
+    const x = 200 + Math.random() * (WORLD_W - 400);
+    const y = 200 + Math.random() * (WORLD_H - 400);
+    if (colisiona(x, y, 60, st.walls)) continue;
+    const d = Math.hypot(x - jugador.x, y - jugador.y);
+    if (d > mejorD && d < 2600) {
+      mejorD = d;
+      mejor = { x, y };
+    }
+  }
+  st.fase = "escape";
+  st.salida = { x: mejor.x, y: mejor.y, r: 52 };
+  st.tiempoEscape = st.duracionEscape;
+  st.mensajes.push({ texto: "¡Se abrió la salida! Corre hacia ella", hasta: st.t + 5 });
+  for (const e of st.entities) {
+    e.camino = [];
+    e.caminoIdx = 0;
+    e.meta = null;
+    e.repathEn = 0;
+  }
+}
+
 export function step(st: GameState, dt: number, input: Input) {
   if (st.estado !== "jugando") return;
   st.t += dt;
