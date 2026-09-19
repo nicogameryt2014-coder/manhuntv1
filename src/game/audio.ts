@@ -8,7 +8,6 @@ let filtro: BiquadFilterNode | null = null;
 let master: GainNode | null = null;
 let ecoWet: GainNode | null = null;
 let musica: HTMLAudioElement | null = null;
-let musicaUrl = "";
 let salud = 1;
 let proximoLatido = 0;
 const conectados = new WeakSet<HTMLMediaElement>();
@@ -56,7 +55,6 @@ function enrutar(el: HTMLMediaElement) {
 
 /** Arranca la música de ronda en bucle. */
 export function iniciarMusicaRonda(url: string) {
-  musicaUrl = url;
   const c = asegurarCtx();
   if (c?.state === "suspended") void c.resume();
   if (!musica) {
