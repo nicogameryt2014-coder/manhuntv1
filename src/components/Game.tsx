@@ -7,6 +7,7 @@ import {
   SURVIVOR_ABILITIES,
   crearJuego,
   cambiarEspectado,
+  focoCamara,
   step,
   type GameState,
   type Input,
@@ -199,10 +200,16 @@ export function Game() {
       }
       const antes = st.fase;
       step(st, dt, input);
-      // suena el efecto por cada golpe de asesino nuevo
+      // suena el efecto por cada golpe nuevo, solo si ocurre dentro de la pantalla
       if (st.golpes.length > golpesVistos.current) {
+        const cam = focoCamara(st);
+        const nuevos = st.golpes.slice(golpesVistos.current);
         golpesVistos.current = st.golpes.length;
-        efecto(golpeAudio.url, 0.8);
+        const visible = nuevos.some(
+          (g) =>
+            Math.abs(g.x - cam.x) < vista.w / 2 + 20 && Math.abs(g.y - cam.y) < vista.h / 2 + 20,
+        );
+        if (visible) efecto(golpeAudio.url, 0.8);
       }
       // suena el efecto por cada muerte definitiva nueva
       if (st.muertes.length > muertesVistas.current) {

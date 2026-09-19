@@ -53,8 +53,8 @@ export function render(
   }
 
   for (const s of st.sangre) {
-    const edad = (st.t - s.nacida) / 30;
-    ctx.fillStyle = `rgba(150, 18, 28, ${Math.max(0, 0.6 - edad * 0.6)})`;
+    const edad = Math.min(1, (st.t - s.nacida) / 8);
+    ctx.fillStyle = `rgba(${Math.round(168 - edad * 60)}, 18, 28, ${0.75 - edad * 0.15})`;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
