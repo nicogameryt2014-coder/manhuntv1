@@ -113,6 +113,8 @@ export type Entity = {
   caidas: number;
   drenajeSig: number;
   sangreSig: number;
+  /** tras ser revivido sigue sangrando un rato */
+  sangradoHasta: number;
   revive: number;
   // navegación / IA
   camino: { x: number; y: number }[];
@@ -177,7 +179,7 @@ export type GameState = {
   mensajes: { texto: string; hasta: number }[];
   muertes: { id: number; t: number }[];
   /** golpes recibidos por sobrevivientes (sonido de impacto) */
-  golpes: { id: number; t: number }[];
+  golpes: { id: number; t: number; x: number; y: number }[];
   tiempoRestante: number;
   /** fase de partida: caza normal o carrera hacia la salida */
   fase: "caza" | "escape";
@@ -275,6 +277,7 @@ function nuevaEntidad(
     caidas: 0,
     drenajeSig: 0,
     sangreSig: 0,
+    sangradoHasta: 0,
     revive: 0,
     camino: [],
     caminoIdx: 0,
@@ -471,6 +474,7 @@ function abatir(st: GameState, e: Entity) {
   }
   e.sufriendo = false;
   e.vivo = false;
+  salpicar(st, e.x, e.y, 26, 1.7);
   st.muertes.push({ id: e.id, t: st.t });
   msg(st, `${e.nombre} ha caído`);
 }
@@ -480,7 +484,25 @@ function revivir(st: GameState, e: Entity) {
   e.revive = 0;
   e.hp = (e.maxHp * SUFRIMIENTO.vidaAlRevivir) / 100;
   e.boost = { mult: SUFRIMIENTO.boostRevivir, hasta: st.t + SUFRIMIENTO.duracionBoost };
+  e.sangradoHasta = st.t + 10;
+  e.sangreSig = st.t;
+  salpicar(st, e.x, e.y, 10, 1.2);
   msg(st, `${e.nombre} fue reanimado`);
+}
+
+/** Salpica manchas de sangre permanentes alrededor de un punto. */
+export function salpicar(st: GameState, x: number, y: number, n: number, escala = 1) {
+  for (let i = 0; i < n; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const d = Math.random() * 26 * escala;
+    st.sangre.push({
+      x: x + Math.cos(ang) * d,
+      y: y + Math.sin(ang) * d,
+      r: (3 + Math.random() * 7) * escala,
+      nacida: st.t,
+    });
+  }
+  if (st.sangre.length > 4000) st.sangre.splice(0, st.sangre.length - 4000);
 }
 
 /** Drenaje, sangre y barra de reanimación de quienes se arrastran. */
@@ -496,6 +518,7 @@ function actualizarSufrimiento(st: GameState, dt: number) {
         e.hp = 0;
         e.sufriendo = false;
         e.vivo = false;
+        salpicar(st, e.x, e.y, 26, 1.7);
         st.muertes.push({ id: e.id, t: st.t });
         msg(st, `${e.nombre} murió desangrado`);
         continue;
@@ -503,7 +526,7 @@ function actualizarSufrimiento(st: GameState, dt: number) {
     }
 
     if (st.t >= e.sangreSig) {
-      st.sangre.push({ x: e.x, y: e.y, r: 5 + Math.random() * 5, nacida: st.t });
+      salpicar(st, e.x, e.y, 3, 1.1);
       e.sangreSig = st.t + 0.35;
     }
 
@@ -521,7 +544,15 @@ function actualizarSufrimiento(st: GameState, dt: number) {
     );
     if (e.revive >= SUFRIMIENTO.segundosRevivir) revivir(st, e);
   }
-  if (st.sangre.length > 600) st.sangre.splice(0, st.sangre.length - 600);
+  // quien acaba de ser reanimado sigue goteando sangre unos segundos
+  for (const e of st.entities) {
+    if (!e.vivo || e.sufriendo || st.t >= e.sangradoHasta) continue;
+    if (st.t >= e.sangreSig) {
+      salpicar(st, e.x, e.y, 2, 0.8);
+      e.sangreSig = st.t + 0.25;
+    }
+  }
+  if (st.sangre.length > 4000) st.sangre.splice(0, st.sangre.length - 4000);
 }
 
 function liberarEscudo(st: GameState, objetivo: Entity) {
@@ -675,7 +706,10 @@ export function intentarRecoger(st: GameState, e: Entity) {
 }
 
 function golpeAsesino(st: GameState, k: Entity, objetivo: Entity) {
-  if (!objetivo.sufriendo) st.golpes.push({ id: objetivo.id, t: st.t });
+  if (!objetivo.sufriendo) {
+    st.golpes.push({ id: objetivo.id, t: st.t, x: objetivo.x, y: objetivo.y });
+    salpicar(st, objetivo.x, objetivo.y, 7, 1);
+  }
   danar(st, objetivo, 20);
   if (k.ability === "venenoso" && st.t < k.venenoArmadoHasta) {
     objetivo.veneno = { hasta: st.t + 6, sig: st.t + 1 };
@@ -1213,7 +1247,10 @@ export function step(st: GameState, dt: number, input: Input) {
     for (const e of st.entities) {
       if (!atacable(e) || e.team !== "survivor") continue;
       if (Math.hypot(e.x - k.x, e.y - k.y) < e.r + 5) {
-        if (!e.sufriendo) st.golpes.push({ id: e.id, t: st.t });
+        if (!e.sufriendo) {
+          st.golpes.push({ id: e.id, t: st.t, x: e.x, y: e.y });
+          salpicar(st, e.x, e.y, 6, 1);
+        }
         danar(st, e, 25);
         k.vivo = false;
         break;
@@ -1239,7 +1276,6 @@ export function step(st: GameState, dt: number, input: Input) {
   }
 
   st.puddles = st.puddles.filter((p) => st.t < p.hasta);
-  st.sangre = st.sangre.filter((s) => st.t - s.nacida < 30);
   st.swings = st.swings.filter((s) => st.t < s.hasta);
   st.mensajes = st.mensajes.filter((m) => st.t < m.hasta);
 
@@ -1272,6 +1308,7 @@ export function step(st: GameState, dt: number, input: Input) {
     for (const e of survVivos) {
       e.vivo = false;
       e.sufriendo = false;
+      salpicar(st, e.x, e.y, 26, 1.7);
       st.muertes.push({ id: e.id, t: st.t });
     }
     st.estado = jugador.escapo ? "ganado" : "perdido";
