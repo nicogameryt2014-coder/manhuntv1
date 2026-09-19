@@ -1113,13 +1113,36 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
     const seguro = puntoSeguro(st, e, killers);
     if (seguro) fijarMeta(st, e, seguro.x, seguro.y, true);
     corriendo = puedeCorrer(e);
+  } else if (charco && vidaFrac < 0.9 && dCharco < 900) {
+    // curarse en el charco del médico antes que cualquier otra cosa
+    e.rol = "apoyar";
+    fijarMeta(st, e, charco.x, charco.y, true);
+    corriendo = dCharco > 150 && puedeCorrer(e);
   } else if (
     socorro &&
+    !debil &&
     (e.ability === "atacante" || e.ability === "medico" || e.ability === "mago") &&
     Math.hypot(socorro.x - e.x, socorro.y - e.y) < 650
   ) {
     e.rol = e.ability === "atacante" ? "rescatar" : "apoyar";
     fijarMeta(st, e, socorro.x, socorro.y, true);
+    corriendo = puedeCorrer(e);
+  } else if (debil) {
+    // herido: se aleja de los asesinos conocidos y se agrupa lejos del peligro
+    e.rol = "huir";
+    const seguro = puntoSeguro(st, e, killers);
+    if (seguro) fijarMeta(st, e, seguro.x, seguro.y, true);
+    else if (!e.meta || Math.hypot(e.meta.x - e.x, e.meta.y - e.y) < 60) {
+      fijarMeta(st, e, 80 + Math.random() * (WORLD_W - 160), 80 + Math.random() * (WORLD_H - 160));
+    }
+    // aún así recoge un botiquín que tenga a mano
+    const boti = st.pickups.find(
+      (p) => !p.tomado && p.kind === "botiquin" && !e.inventario.botiquin && Math.hypot(p.x - e.x, p.y - e.y) < 420,
+    );
+    if (boti) {
+      e.rol = "buscar";
+      fijarMeta(st, e, boti.x, boti.y, true);
+    }
     corriendo = puedeCorrer(e);
   } else {
     // buscar objetos que le falten, si no agruparse con el compañero más cercano
