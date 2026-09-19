@@ -162,7 +162,22 @@ export function Game() {
         cancelar: pulsos.current.cancelar,
       };
       pulsos.current = { habilidad: false, recoger: false, item: null, cancelar: false };
+      // la fase de escape dura exactamente lo que la pista de audio
+      if (st.fase === "caza" && duracionMusica.current > 0) {
+        st.duracionEscape = duracionMusica.current;
+      }
+      const antes = st.fase;
       step(st, dt, input);
+      if (antes === "caza" && st.fase === "escape") {
+        const a = musicaRef.current;
+        if (a) {
+          a.currentTime = 0;
+          void a.play().catch(() => {});
+        }
+      }
+      if (st.estado !== "jugando" && musicaRef.current && !musicaRef.current.paused) {
+        musicaRef.current.pause();
+      }
       render(ctx, st, vista.w, vista.h, debugRef.current);
 
       const p = st.entities.find((e) => e.isPlayer);
