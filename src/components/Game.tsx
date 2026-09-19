@@ -511,6 +511,17 @@ export function Game() {
                     style={{ width: `${hud.hp}%` }}
                   />
                 </div>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <div className="h-1.5 flex-1 rounded bg-white/10">
+                    <div
+                      className={`h-1.5 rounded transition-[width] ${hud.agotado ? "bg-destructive" : "bg-green-500"}`}
+                      style={{ width: `${hud.spFrac * 100}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {hud.agotado ? "¡Sin stamina!" : `${hud.sp} SP`}
+                  </span>
+                </div>
                 {hud.sufriendo && (
                   <>
                     <div className="mt-1 h-2 rounded bg-white/10">
