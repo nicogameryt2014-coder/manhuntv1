@@ -35,6 +35,9 @@ type Hud = {
   peligro: number;
   fantasma: boolean;
   observando: string | null;
+  escape: boolean;
+  escapados: number;
+  escapaste: boolean;
 };
 
 type TouchMove = { x: number; y: number };
