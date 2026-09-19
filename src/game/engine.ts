@@ -4,6 +4,16 @@
 import { buscarCamino, construirGrid, lineaLibre, type Grid } from "./pathfind";
 
 export type SurvivorAbility = "medico" | "atacante" | "asustadizo" | "mago";
+
+/** Stamina: se gasta al correr y se recupera al no correr. */
+export const STAMINA = {
+  maxSobreviviente: 100,
+  maxAsesino: 140,
+  gastoSobreviviente: 20, // SP por segundo corriendo
+  gastoAsesino: 21,
+  regen: 28, // SP por segundo sin correr
+  umbralRecuperacion: 30, // si te agotas, no corres hasta llegar a esto
+};
 export type KillerAbility = "venenoso" | "ninja";
 export type ItemKind = "botiquin" | "cola" | "antidoto";
 
@@ -263,6 +273,10 @@ function nuevaEntidad(
     r: 15,
     hp: 100,
     maxHp: 100,
+    sp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
+    maxSp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
+    agotado: false,
+    corrio: false,
     fx: 0,
     fy: 1,
     isPlayer,
