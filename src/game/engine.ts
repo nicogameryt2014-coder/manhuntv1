@@ -90,6 +90,13 @@ export type Entity = {
   r: number;
   hp: number;
   maxHp: number;
+  /** stamina: se gasta al correr */
+  sp: number;
+  maxSp: number;
+  /** sin stamina hasta recuperar un mínimo */
+  agotado: boolean;
+  /** corrió durante este tick (para gasto/regen) */
+  corrio: boolean;
   fx: number;
   fy: number;
   isPlayer: boolean;
