@@ -176,6 +176,8 @@ export type GameState = {
   modo: ModoMuerte;
   mensajes: { texto: string; hasta: number }[];
   muertes: { id: number; t: number }[];
+  /** golpes recibidos por sobrevivientes (sonido de impacto) */
+  golpes: { id: number; t: number }[];
   tiempoRestante: number;
   /** fase de partida: caza normal o carrera hacia la salida */
   fase: "caza" | "escape";
@@ -392,6 +394,7 @@ export function crearJuego(cfg: Config): GameState {
     modo: cfg.modo,
     mensajes: [],
     muertes: [],
+    golpes: [],
     tiempoRestante: cfg.duracion,
     fase: "caza",
     salida: null,
