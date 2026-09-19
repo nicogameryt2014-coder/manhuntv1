@@ -452,7 +452,21 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 
 export function puedeCorrer(e: Entity): boolean {
   if (e.sufriendo) return false;
+  if (e.agotado || e.sp <= 0) return false;
   return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+}
+
+/** Gasto y regeneración de stamina según si corrió este tick. */
+function actualizarStamina(e: Entity, dt: number) {
+  if (e.corrio) {
+    const gasto = e.team === "killer" ? STAMINA.gastoAsesino : STAMINA.gastoSobreviviente;
+    e.sp = Math.max(0, e.sp - gasto * dt);
+    if (e.sp <= 0) e.agotado = true;
+  } else {
+    e.sp = Math.min(e.maxSp, e.sp + STAMINA.regen * dt);
+    if (e.agotado && e.sp >= STAMINA.umbralRecuperacion) e.agotado = false;
+  }
+  e.corrio = false;
 }
 
 /** Objetivo válido para un asesino: vivo y no arrastrándose. */
