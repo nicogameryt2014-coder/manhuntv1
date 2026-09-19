@@ -202,26 +202,19 @@ export function Game() {
       // suena el efecto por cada golpe de asesino nuevo
       if (st.golpes.length > golpesVistos.current) {
         golpesVistos.current = st.golpes.length;
-        const g = new Audio(golpeAudio.url);
-        g.volume = 0.8;
-        void g.play().catch(() => {});
+        efecto(golpeAudio.url, 0.8);
       }
       // suena el efecto por cada muerte definitiva nueva
       if (st.muertes.length > muertesVistas.current) {
         muertesVistas.current = st.muertes.length;
-        const s = new Audio(muerteAudio.url);
-        s.volume = 0.9;
-        void s.play().catch(() => {});
+        efecto(muerteAudio.url, 0.9);
       }
       if (antes === "caza" && st.fase === "escape") {
-        const a = musicaRef.current;
-        if (a) {
-          a.currentTime = 0;
-          void a.play().catch(() => {});
-        }
+        if (musicaRef.current) pista(musicaRef.current);
       }
-      if (st.estado !== "jugando" && musicaRef.current && !musicaRef.current.paused) {
-        musicaRef.current.pause();
+      if (st.estado !== "jugando") {
+        if (musicaRef.current && !musicaRef.current.paused) musicaRef.current.pause();
+        pararMusicaRonda();
       }
       render(ctx, st, vista.w, vista.h, debugRef.current);
 
