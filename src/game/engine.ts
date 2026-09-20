@@ -491,7 +491,6 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (e.sufriendo) return SURV_WALK * SUFRIMIENTO.lentitud;
   const esSurv = e.team === "survivor";
   let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
-  if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
   if (conBoost) base *= e.boost!.mult;
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
@@ -501,8 +500,9 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 export function puedeCorrer(e: Entity): boolean {
   if (e.sufriendo) return false;
   if (e.agotado || e.sp <= 0) return false;
-  return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+  return true;
 }
+
 
 /** Gasto y regeneración de stamina según si corrió este tick. */
 function actualizarStamina(e: Entity, dt: number) {
@@ -528,16 +528,23 @@ function msg(st: GameState, texto: string) {
 
 function danar(st: GameState, e: Entity, cantidad: number) {
   if (e.sufriendo) return; // arrastrándose no se recibe daño externo
-  let d = cantidad;
+  // en sobreadrenalina recibes un 10% más de daño
+  let d = e.adrenalina > 0 ? cantidad * 1.1 : cantidad;
   if (e.escudo && st.t < e.escudo.hasta) {
     const absorbido = Math.min(e.escudo.hp, d);
     e.escudo.hp -= absorbido;
     d -= absorbido;
     if (e.escudo.hp <= 0) liberarEscudo(st, e);
   }
+  if (e.adrenalina > 0 && d > 0) {
+    const absorbido = Math.min(e.adrenalina, d);
+    e.adrenalina -= absorbido;
+    d -= absorbido;
+  }
   e.hp -= d;
   if (e.hp <= 0) abatir(st, e);
 }
+
 
 /** Vida a 0: muerte directa o entrada al estado de sufrimiento. */
 function abatir(st: GameState, e: Entity) {
