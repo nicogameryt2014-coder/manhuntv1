@@ -2,11 +2,14 @@ import {
   WORLD_W,
   WORLD_H,
   SUFRIMIENTO,
+  ATACANTE_ALCANCE,
+  ATACANTE_RADIO,
   focoCamara,
   type Entity,
   type GameState,
   ITEM_INFO,
 } from "./engine";
+
 
 const COL = {
   suelo: "#151a22",
@@ -158,13 +161,11 @@ export function render(
   for (const s of st.swings) {
     const cx = s.x + s.fx * ATACANTE_ALCANCE;
     const cy = s.y + s.fy * ATACANTE_ALCANCE;
-    ctx.beginPath();
-    ctx.arc(cx, cy, ATACANTE_RADIO, 0, Math.PI * 2);
-
     ctx.fillStyle = "rgba(242, 193, 78, 0.35)";
     ctx.beginPath();
-    ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+    ctx.arc(cx, cy, ATACANTE_RADIO, 0, Math.PI * 2);
     ctx.fill();
+
     if (debug) {
       ctx.strokeStyle = "#00ff88";
       ctx.lineWidth = 2;
