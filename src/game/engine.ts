@@ -92,6 +92,9 @@ export const MEDICO_MAX_HP = 50;
 export const ADRENALINA_HP = 100;
 export const ADRENALINA_DRENAJE = 4.5;
 export const BLOQUEO_DURACION = 3;
+/** distancia del centro del golpe del atacante y su radio */
+export const ATACANTE_ALCANCE = 56;
+export const ATACANTE_RADIO = 78;
 
 
 export const ITEM_INFO: Record<
@@ -258,6 +261,7 @@ export type Input = {
   right: boolean;
   run: boolean;
   usarHabilidad: boolean;
+  usarHabilidad2: boolean;
   recoger: boolean;
   usarItem: ItemKind | null;
   cancelar: boolean;
@@ -744,6 +748,39 @@ export function usarHabilidad(st: GameState, e: Entity) {
   e.cooldownTotal = cd;
 }
 
+/** Segunda habilidad de los sobrevivientes. */
+export function usarHabilidad2(st: GameState, e: Entity) {
+  if (!e.vivo || e.sufriendo || st.t < e.stunHasta) return;
+  if (e.team !== "survivor") return;
+  if (st.t < e.cooldown2Hasta) return;
+  const ab = e.ability as SurvivorAbility;
+  const cd = ABILITY2_INFO[ab].cooldown;
+  switch (ab) {
+    case "medico": {
+      e.boost = { mult: 3, hasta: st.t + 7 };
+      e.slowHasta = st.t + 11;
+      break;
+    }
+    case "atacante": {
+      e.bloqueoHasta = st.t + BLOQUEO_DURACION;
+      if (e.isPlayer) msg(st, "Bloqueo activo 3 s");
+      break;
+    }
+    case "asustadizo": {
+      e.adrenalina = ADRENALINA_HP;
+      if (e.isPlayer) msg(st, "Sobreadrenalina: +100 HP temporal");
+      break;
+    }
+    case "mago": {
+      e.escudo = { hp: 25, hasta: st.t + 5 };
+      if (e.isPlayer) msg(st, "Escudo propio");
+      break;
+    }
+  }
+  e.cooldown2Hasta = st.t + cd;
+  e.cooldown2Total = cd;
+}
+
 export function iniciarItem(st: GameState, e: Entity, kind: ItemKind) {
   if (!e.inventario[kind] || e.canalizando || !e.vivo) return;
   // el antídoto sólo funciona mientras te arrastras; el resto, sólo en pie
@@ -797,6 +834,16 @@ export function intentarRecoger(st: GameState, e: Entity) {
 }
 
 function golpeAsesino(st: GameState, k: Entity, objetivo: Entity) {
+  // Bloqueo del atacante: contraataca en vez de recibir el golpe
+  if (st.t < objetivo.bloqueoHasta) {
+    objetivo.bloqueoHasta = 0;
+    k.stunHasta = st.t + BLOQUEO_DURACION;
+    objetivo.hp = Math.min(objetivo.maxHp, objetivo.hp + 10);
+    objetivo.boost = { mult: 1.5, hasta: st.t + 2 };
+    k.ataqueListo = st.t + 1.6;
+    msg(st, `${objetivo.nombre} bloqueó el golpe de ${k.nombre}`);
+    return;
+  }
   if (!objetivo.sufriendo) {
     st.golpes.push({ id: objetivo.id, t: st.t, x: objetivo.x, y: objetivo.y });
     salpicar(st, objetivo.x, objetivo.y, 7, 1);
@@ -1327,6 +1374,7 @@ export function step(st: GameState, dt: number, input: Input) {
     }
     if (!jugador.sufriendo) {
       if (input.usarHabilidad) usarHabilidad(st, jugador);
+      if (input.usarHabilidad2) usarHabilidad2(st, jugador);
       if (input.recoger) intentarRecoger(st, jugador);
       if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
     } else if (input.usarItem === "antidoto") {
@@ -1366,6 +1414,9 @@ export function step(st: GameState, dt: number, input: Input) {
         e.veneno.sig += 1;
       }
       if (st.t >= e.veneno.hasta) e.veneno = null;
+    }
+    if (e.adrenalina > 0) {
+      e.adrenalina = Math.max(0, e.adrenalina - ADRENALINA_DRENAJE * dt);
     }
     if (e.escudo && st.t >= e.escudo.hasta) liberarEscudo(st, e);
     if (e.boost && st.t >= e.boost.hasta) e.boost = null;
