@@ -1238,6 +1238,18 @@ function iaSobreviviente(st: GameState, e: Entity, dt: number) {
       if (herido && (!charco || dCharco > 200)) usarHabilidad(st, e);
     }
   }
+  // ---- segunda habilidad: defensiva, según el peligro y la vida
+  if (st.t >= e.cooldown2Hasta) {
+    if (e.ability === "atacante") {
+      if (peligro && amenaza!.d < 90) usarHabilidad2(st, e);
+    } else if (e.ability === "mago") {
+      if (peligro && amenaza!.d < 170) usarHabilidad2(st, e);
+    } else if (e.ability === "asustadizo") {
+      if (peligro && (debil || amenaza!.d < 200)) usarHabilidad2(st, e);
+    } else if (e.ability === "medico") {
+      if (peligro && amenaza!.d < 240) usarHabilidad2(st, e);
+    }
+  }
   // objetos: se usan a cubierto
   if (!peligro && !e.canalizando) {
     if (e.inventario.botiquin && vidaFrac < 0.7) iniciarItem(st, e, "botiquin");
