@@ -145,6 +145,14 @@ export type Entity = {
   isPlayer: boolean;
   cooldownHasta: number;
   cooldownTotal: number;
+  /** segunda habilidad (sólo sobrevivientes) */
+  cooldown2Hasta: number;
+  cooldown2Total: number;
+  /** atacante: tiempo de bloqueo activo */
+  bloqueoHasta: number;
+  /** asustadizo: HP temporal de sobreadrenalina */
+  adrenalina: number;
+
   stunHasta: number;
   boost: { mult: number; hasta: number } | null;
   slowHasta: number;
@@ -304,8 +312,9 @@ function nuevaEntidad(
     x,
     y,
     r: 15,
-    hp: 100,
-    maxHp: 100,
+    hp: ability === "medico" ? MEDICO_MAX_HP : 100,
+    maxHp: ability === "medico" ? MEDICO_MAX_HP : 100,
+
     sp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
     maxSp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
     agotado: false,
@@ -315,6 +324,12 @@ function nuevaEntidad(
     isPlayer,
     cooldownHasta: 0,
     cooldownTotal: ABILITY_INFO[ability].cooldown,
+    cooldown2Hasta: 0,
+    cooldown2Total:
+      team === "survivor" ? ABILITY2_INFO[ability as SurvivorAbility].cooldown : 0,
+    bloqueoHasta: 0,
+    adrenalina: 0,
+
     stunHasta: 0,
     boost: null,
     slowHasta: 0,
