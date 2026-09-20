@@ -244,6 +244,7 @@ export function Game() {
       const gris = !p.vivo || p.sufriendo ? 1 : Math.max(0, 1 - vidaFrac / 0.7);
       const peligro = p.sufriendo && p.vivo ? 1 - vidaFrac : 0;
       const brillo = 1 - peligro * 0.45;
+      const spMostrado = Math.max(0, Math.min(p.maxSp, Math.round(p.sp)));
       canvas.style.filter =
         gris > 0.02 || peligro > 0.02
           ? `grayscale(${gris.toFixed(2)}) sepia(${(gris * 0.35).toFixed(2)}) brightness(${brillo.toFixed(2)})`
@@ -258,8 +259,8 @@ export function Game() {
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         peligro,
         hp: Math.max(0, Math.round(p.hp)),
-        sp: Math.round(p.sp),
-        spFrac: Math.max(0, Math.min(1, p.sp / p.maxSp)),
+        sp: spMostrado,
+        spFrac: p.maxSp > 0 ? spMostrado / p.maxSp : 0,
         agotado: p.agotado,
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
@@ -515,7 +516,7 @@ export function Game() {
                   <span className="w-6 shrink-0 font-mono text-[10px] text-muted-foreground">SP</span>
                   <div className="h-2 flex-1 rounded bg-white/10">
                     <div
-                      className={`h-2 rounded transition-[width] ${
+                      className={`h-2 rounded ${
                         hud.agotado
                           ? "bg-destructive"
                           : hud.spFrac < 0.35
