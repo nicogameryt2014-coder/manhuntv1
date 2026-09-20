@@ -677,17 +677,18 @@ export function usarHabilidad(st: GameState, e: Entity) {
     }
     case "atacante": {
       st.swings.push({ x: e.x, y: e.y, fx: e.fx, fy: e.fy, hasta: st.t + 0.25 });
-      const cx = e.x + e.fx * 44;
-      const cy = e.y + e.fy * 44;
+      const cx = e.x + e.fx * ATACANTE_ALCANCE;
+      const cy = e.y + e.fy * ATACANTE_ALCANCE;
       for (const o of st.entities) {
         if (o.team !== "killer" || !o.vivo) continue;
-        if (Math.hypot(o.x - cx, o.y - cy) < 46 + o.r) {
+        if (Math.hypot(o.x - cx, o.y - cy) < ATACANTE_RADIO + o.r) {
           o.stunHasta = st.t + 5;
           msg(st, `${o.nombre} aturdido 5 s`);
         }
       }
       e.boost = { mult: 1.5, hasta: st.t + 2 };
       break;
+
     }
     case "asustadizo": {
       e.boost = { mult: 3, hasta: st.t + 10 };
