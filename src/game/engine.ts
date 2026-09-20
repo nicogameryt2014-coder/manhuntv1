@@ -32,12 +32,12 @@ export const ABILITY_INFO: Record<
   medico: {
     nombre: "Médico",
     cooldown: 15,
-    desc: "Lanza un charco curativo gigante (6 s). +6 HP/s, o +12 HP/s si el médico tiene más de 40 HP.",
+    desc: "Lanza un charco curativo gigante (6 s). +6 HP/s, o +12 HP/s si el médico tiene más de 40 HP. Sólo tiene 50 HP máximos.",
   },
   atacante: {
     nombre: "Atacante",
     cooldown: 35,
-    desc: "Golpe en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s.",
+    desc: "Golpe amplio en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s.",
   },
   asustadizo: {
     nombre: "Asustadizo",
@@ -47,7 +47,7 @@ export const ABILITY_INFO: Record<
   mago: {
     nombre: "Mago",
     cooldown: 15,
-    desc: "Escudo de 25 HP por 5 s al sobreviviente más cercano. Mientras dura vas a 0.2x y no puedes correr. Cancelarlo suma 10 s de cooldown.",
+    desc: "Escudo de 25 HP por 5 s al sobreviviente más cercano, sin perder velocidad. Cancelarlo suma 10 s de cooldown.",
   },
   venenoso: {
     nombre: "Venenoso",
@@ -60,6 +60,39 @@ export const ABILITY_INFO: Record<
     desc: "Lanza 3 cuchillos en abanico. 25 HP de daño, chocan con paredes.",
   },
 };
+
+/** Segunda habilidad de cada sobreviviente (tecla de habilidad 2). */
+export const ABILITY2_INFO: Record<
+  SurvivorAbility,
+  { nombre: string; cooldown: number; desc: string }
+> = {
+  medico: {
+    nombre: "Carrera médica",
+    cooldown: 30,
+    desc: "Velocidad x3 por 7 s; luego quedas ralentizado 4 s.",
+  },
+  atacante: {
+    nombre: "Bloqueo",
+    cooldown: 25,
+    desc: "Te cubres 3 s: si un asesino te golpea, se aturde 3 s, ganas +10 HP y 1.5x velocidad por 2 s.",
+  },
+  asustadizo: {
+    nombre: "Sobreadrenalina",
+    cooldown: 45,
+    desc: "+100 HP temporal que se gasta a 4.5/s, pero recibes un 10% más de daño mientras dure.",
+  },
+  mago: {
+    nombre: "Escudo propio",
+    cooldown: 20,
+    desc: "Escudo de 25 HP por 5 s sobre ti mismo.",
+  },
+};
+
+export const MEDICO_MAX_HP = 50;
+export const ADRENALINA_HP = 100;
+export const ADRENALINA_DRENAJE = 4.5;
+export const BLOQUEO_DURACION = 3;
+
 
 export const ITEM_INFO: Record<
   ItemKind,
