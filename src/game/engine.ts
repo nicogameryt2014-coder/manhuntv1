@@ -32,12 +32,12 @@ export const ABILITY_INFO: Record<
   medico: {
     nombre: "Médico",
     cooldown: 15,
-    desc: "Lanza un charco curativo gigante (6 s). +6 HP/s, o +12 HP/s si el médico tiene más de 40 HP.",
+    desc: "Lanza un charco curativo gigante (6 s). +6 HP/s, o +12 HP/s si el médico tiene más de 40 HP. Sólo tiene 50 HP máximos.",
   },
   atacante: {
     nombre: "Atacante",
     cooldown: 35,
-    desc: "Golpe en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s.",
+    desc: "Golpe amplio en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s.",
   },
   asustadizo: {
     nombre: "Asustadizo",
@@ -47,7 +47,7 @@ export const ABILITY_INFO: Record<
   mago: {
     nombre: "Mago",
     cooldown: 15,
-    desc: "Escudo de 25 HP por 5 s al sobreviviente más cercano. Mientras dura vas a 0.2x y no puedes correr. Cancelarlo suma 10 s de cooldown.",
+    desc: "Escudo de 25 HP por 5 s al sobreviviente más cercano, sin perder velocidad. Cancelarlo suma 10 s de cooldown.",
   },
   venenoso: {
     nombre: "Venenoso",
@@ -60,6 +60,39 @@ export const ABILITY_INFO: Record<
     desc: "Lanza 3 cuchillos en abanico. 25 HP de daño, chocan con paredes.",
   },
 };
+
+/** Segunda habilidad de cada sobreviviente (tecla de habilidad 2). */
+export const ABILITY2_INFO: Record<
+  SurvivorAbility,
+  { nombre: string; cooldown: number; desc: string }
+> = {
+  medico: {
+    nombre: "Carrera médica",
+    cooldown: 30,
+    desc: "Velocidad x3 por 7 s; luego quedas ralentizado 4 s.",
+  },
+  atacante: {
+    nombre: "Bloqueo",
+    cooldown: 25,
+    desc: "Te cubres 3 s: si un asesino te golpea, se aturde 3 s, ganas +10 HP y 1.5x velocidad por 2 s.",
+  },
+  asustadizo: {
+    nombre: "Sobreadrenalina",
+    cooldown: 45,
+    desc: "+100 HP temporal que se gasta a 4.5/s, pero recibes un 10% más de daño mientras dure.",
+  },
+  mago: {
+    nombre: "Escudo propio",
+    cooldown: 20,
+    desc: "Escudo de 25 HP por 5 s sobre ti mismo.",
+  },
+};
+
+export const MEDICO_MAX_HP = 50;
+export const ADRENALINA_HP = 100;
+export const ADRENALINA_DRENAJE = 4.5;
+export const BLOQUEO_DURACION = 3;
+
 
 export const ITEM_INFO: Record<
   ItemKind,
@@ -112,6 +145,14 @@ export type Entity = {
   isPlayer: boolean;
   cooldownHasta: number;
   cooldownTotal: number;
+  /** segunda habilidad (sólo sobrevivientes) */
+  cooldown2Hasta: number;
+  cooldown2Total: number;
+  /** atacante: tiempo de bloqueo activo */
+  bloqueoHasta: number;
+  /** asustadizo: HP temporal de sobreadrenalina */
+  adrenalina: number;
+
   stunHasta: number;
   boost: { mult: number; hasta: number } | null;
   slowHasta: number;
@@ -271,8 +312,9 @@ function nuevaEntidad(
     x,
     y,
     r: 15,
-    hp: 100,
-    maxHp: 100,
+    hp: ability === "medico" ? MEDICO_MAX_HP : 100,
+    maxHp: ability === "medico" ? MEDICO_MAX_HP : 100,
+
     sp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
     maxSp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
     agotado: false,
@@ -282,6 +324,12 @@ function nuevaEntidad(
     isPlayer,
     cooldownHasta: 0,
     cooldownTotal: ABILITY_INFO[ability].cooldown,
+    cooldown2Hasta: 0,
+    cooldown2Total:
+      team === "survivor" ? ABILITY2_INFO[ability as SurvivorAbility].cooldown : 0,
+    bloqueoHasta: 0,
+    adrenalina: 0,
+
     stunHasta: 0,
     boost: null,
     slowHasta: 0,
@@ -443,7 +491,6 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (e.sufriendo) return SURV_WALK * SUFRIMIENTO.lentitud;
   const esSurv = e.team === "survivor";
   let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
-  if (e.ability === "mago" && e.escudoActivoSobre !== null) base = SURV_WALK * 0.2;
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
   if (conBoost) base *= e.boost!.mult;
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
@@ -453,8 +500,9 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
 export function puedeCorrer(e: Entity): boolean {
   if (e.sufriendo) return false;
   if (e.agotado || e.sp <= 0) return false;
-  return !(e.ability === "mago" && e.escudoActivoSobre !== null);
+  return true;
 }
+
 
 /** Gasto y regeneración de stamina según si corrió este tick. */
 function actualizarStamina(e: Entity, dt: number) {
@@ -480,16 +528,23 @@ function msg(st: GameState, texto: string) {
 
 function danar(st: GameState, e: Entity, cantidad: number) {
   if (e.sufriendo) return; // arrastrándose no se recibe daño externo
-  let d = cantidad;
+  // en sobreadrenalina recibes un 10% más de daño
+  let d = e.adrenalina > 0 ? cantidad * 1.1 : cantidad;
   if (e.escudo && st.t < e.escudo.hasta) {
     const absorbido = Math.min(e.escudo.hp, d);
     e.escudo.hp -= absorbido;
     d -= absorbido;
     if (e.escudo.hp <= 0) liberarEscudo(st, e);
   }
+  if (e.adrenalina > 0 && d > 0) {
+    const absorbido = Math.min(e.adrenalina, d);
+    e.adrenalina -= absorbido;
+    d -= absorbido;
+  }
   e.hp -= d;
   if (e.hp <= 0) abatir(st, e);
 }
+
 
 /** Vida a 0: muerte directa o entrada al estado de sufrimiento. */
 function abatir(st: GameState, e: Entity) {
@@ -622,17 +677,18 @@ export function usarHabilidad(st: GameState, e: Entity) {
     }
     case "atacante": {
       st.swings.push({ x: e.x, y: e.y, fx: e.fx, fy: e.fy, hasta: st.t + 0.25 });
-      const cx = e.x + e.fx * 44;
-      const cy = e.y + e.fy * 44;
+      const cx = e.x + e.fx * ATACANTE_ALCANCE;
+      const cy = e.y + e.fy * ATACANTE_ALCANCE;
       for (const o of st.entities) {
         if (o.team !== "killer" || !o.vivo) continue;
-        if (Math.hypot(o.x - cx, o.y - cy) < 46 + o.r) {
+        if (Math.hypot(o.x - cx, o.y - cy) < ATACANTE_RADIO + o.r) {
           o.stunHasta = st.t + 5;
           msg(st, `${o.nombre} aturdido 5 s`);
         }
       }
       e.boost = { mult: 1.5, hasta: st.t + 2 };
       break;
+
     }
     case "asustadizo": {
       e.boost = { mult: 3, hasta: st.t + 10 };
