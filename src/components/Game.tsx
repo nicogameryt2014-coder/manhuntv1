@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
-import { FlaskConical, Hand, PackageOpen, ShieldPlus, X, Zap } from "lucide-react";
+import { FlaskConical, Hand, PackageOpen, ShieldPlus, Sparkles, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ABILITY_INFO,
+  ABILITY2_INFO,
   ITEM_INFO,
   SURVIVOR_ABILITIES,
   crearJuego,
@@ -25,6 +26,73 @@ import { actualizarAudio, efecto, iniciarMusicaRonda, pararMusicaRonda, pista } 
 
 type Fase = "menu" | "jugando";
 
+/** Acciones con tecla personalizable. */
+export type Accion =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "run"
+  | "habilidad"
+  | "habilidad2"
+  | "recoger"
+  | "botiquin"
+  | "cola"
+  | "antidoto"
+  | "cancelar";
+
+const ACCION_NOMBRE: Record<Accion, string> = {
+  up: "Arriba",
+  down: "Abajo",
+  left: "Izquierda",
+  right: "Derecha",
+  run: "Correr",
+  habilidad: "Habilidad 1",
+  habilidad2: "Habilidad 2",
+  recoger: "Recoger objeto",
+  botiquin: "Usar botiquín",
+  cola: "Usar cola",
+  antidoto: "Usar antídoto",
+  cancelar: "Cancelar acción",
+};
+
+const TECLAS_DEFECTO: Record<Accion, string> = {
+  up: "w",
+  down: "s",
+  left: "a",
+  right: "d",
+  run: "shift",
+  habilidad: " ",
+  habilidad2: "q",
+  recoger: "e",
+  botiquin: "1",
+  cola: "2",
+  antidoto: "3",
+  cancelar: "escape",
+};
+
+const ACCIONES = Object.keys(TECLAS_DEFECTO) as Accion[];
+const TECLAS_STORAGE = "ultimo-turno-teclas";
+
+function nombreTecla(k: string): string {
+  if (k === " ") return "Espacio";
+  if (k === "escape") return "Esc";
+  if (k === "shift") return "Shift";
+  if (k.startsWith("arrow")) return k.replace("arrow", "↑↓←→"[["up", "down", "left", "right"].indexOf(k.slice(5))] ?? "");
+  return k.toUpperCase();
+}
+
+function leerTeclas(): Record<Accion, string> {
+  if (typeof localStorage === "undefined") return { ...TECLAS_DEFECTO };
+  try {
+    const raw = localStorage.getItem(TECLAS_STORAGE);
+    if (!raw) return { ...TECLAS_DEFECTO };
+    return { ...TECLAS_DEFECTO, ...(JSON.parse(raw) as Record<Accion, string>) };
+  } catch {
+    return { ...TECLAS_DEFECTO };
+  }
+}
+
 type Hud = {
   hp: number;
   sp: number;
@@ -33,6 +101,8 @@ type Hud = {
   escudo: number;
   cooldown: number;
   cooldownTotal: number;
+  cooldown2: number;
+  cooldown2Total: number;
   canal: { nombre: string; progreso: number } | null;
   inventario: ItemKind[];
   tiempo: number;
@@ -68,13 +138,23 @@ export function Game() {
   const [tactil, setTactil] = useState(false);
   const [palanca, setPalanca] = useState<TouchMove>({ x: 0, y: 0 });
   const [vista, setVista] = useState({ w: VW, h: VH });
+  const [teclas, setTeclas] = useState<Record<Accion, string>>(() => ({ ...TECLAS_DEFECTO }));
+  const [capturando, setCapturando] = useState<Accion | null>(null);
+  const teclasRef = useRef(teclas);
+  teclasRef.current = teclas;
+  const capturandoRef = useRef<Accion | null>(null);
+  capturandoRef.current = capturando;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState | null>(null);
   const keys = useRef<Record<string, boolean>>({});
-  const pulsos = useRef<{ habilidad: boolean; recoger: boolean; item: ItemKind | null; cancelar: boolean }>(
-    { habilidad: false, recoger: false, item: null, cancelar: false },
-  );
+  const pulsos = useRef<{
+    habilidad: boolean;
+    habilidad2: boolean;
+    recoger: boolean;
+    item: ItemKind | null;
+    cancelar: boolean;
+  }>({ habilidad: false, habilidad2: false, recoger: false, item: null, cancelar: false });
   const musicaRef = useRef<HTMLAudioElement | null>(null);
   const duracionMusica = useRef(0);
   const muertesVistas = useRef(0);
@@ -101,6 +181,33 @@ export function Game() {
     [nSobrevivientes, nAsesinos, modo],
   );
 
+
+  useEffect(() => {
+    setTeclas(leerTeclas());
+  }, []);
+
+  const guardarTecla = useCallback((accion: Accion, key: string) => {
+    setTeclas((prev) => {
+      const next = { ...prev };
+      for (const a of ACCIONES) if (next[a] === key && a !== accion) next[a] = "";
+      next[accion] = key;
+      try {
+        localStorage.setItem(TECLAS_STORAGE, JSON.stringify(next));
+      } catch {
+        /* sin almacenamiento */
+      }
+      return next;
+    });
+  }, []);
+
+  const restaurarTeclas = useCallback(() => {
+    setTeclas({ ...TECLAS_DEFECTO });
+    try {
+      localStorage.removeItem(TECLAS_STORAGE);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
 
   // pista que suena al abrirse la salida; su duración marca el tiempo de escape
   useEffect(() => {
@@ -140,14 +247,23 @@ export function Game() {
   useEffect(() => {
     const down = (ev: KeyboardEvent) => {
       const k = ev.key.toLowerCase();
+      // captura de tecla para personalizar controles
+      if (capturandoRef.current) {
+        ev.preventDefault();
+        if (k !== "tab") guardarTecla(capturandoRef.current, k);
+        setCapturando(null);
+        return;
+      }
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) ev.preventDefault();
       keys.current[k] = true;
-      if (k === " " || k === "q") pulsos.current.habilidad = true;
-      if (k === "e") pulsos.current.recoger = true;
-      if (k === "1") pulsos.current.item = "botiquin";
-      if (k === "2") pulsos.current.item = "cola";
-      if (k === "3") pulsos.current.item = "antidoto";
-      if (k === "escape") pulsos.current.cancelar = true;
+      const t = teclasRef.current;
+      if (k === t.habilidad) pulsos.current.habilidad = true;
+      if (k === t.habilidad2) pulsos.current.habilidad2 = true;
+      if (k === t.recoger) pulsos.current.recoger = true;
+      if (k === t.botiquin) pulsos.current.item = "botiquin";
+      if (k === t.cola) pulsos.current.item = "cola";
+      if (k === t.antidoto) pulsos.current.item = "antidoto";
+      if (k === t.cancelar) pulsos.current.cancelar = true;
       if (k === "tab" || k === "f") {
         const st = stateRef.current;
         const p = st?.entities.find((e) => e.isPlayer);
@@ -166,7 +282,7 @@ export function Game() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [guardarTecla]);
 
   useEffect(() => {
     if (fase !== "jugando") return;
@@ -185,18 +301,20 @@ export function Game() {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const k = keys.current;
+      const t = teclasRef.current;
       const input: Input = {
-        up: !!(k["w"] || k["arrowup"] || touchMove.current.y < -0.25),
-        down: !!(k["s"] || k["arrowdown"] || touchMove.current.y > 0.25),
-        left: !!(k["a"] || k["arrowleft"] || touchMove.current.x < -0.25),
-        right: !!(k["d"] || k["arrowright"] || touchMove.current.x > 0.25),
-        run: !!(k["shift"] || touchRun.current),
+        up: !!(k[t.up] || k["arrowup"] || touchMove.current.y < -0.25),
+        down: !!(k[t.down] || k["arrowdown"] || touchMove.current.y > 0.25),
+        left: !!(k[t.left] || k["arrowleft"] || touchMove.current.x < -0.25),
+        right: !!(k[t.right] || k["arrowright"] || touchMove.current.x > 0.25),
+        run: !!(k[t.run] || touchRun.current),
         usarHabilidad: pulsos.current.habilidad,
+        usarHabilidad2: pulsos.current.habilidad2,
         recoger: pulsos.current.recoger,
         usarItem: pulsos.current.item,
         cancelar: pulsos.current.cancelar,
       };
-      pulsos.current = { habilidad: false, recoger: false, item: null, cancelar: false };
+      pulsos.current = { habilidad: false, habilidad2: false, recoger: false, item: null, cancelar: false };
       // la fase de escape dura exactamente lo que la pista de audio
       if (st.fase === "caza" && duracionMusica.current > 0) {
         st.duracionEscape = duracionMusica.current;
@@ -265,6 +383,8 @@ export function Game() {
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
         cooldown: Math.max(0, p.cooldownHasta - st.t),
         cooldownTotal: p.cooldownTotal,
+        cooldown2: Math.max(0, p.cooldown2Hasta - st.t),
+        cooldown2Total: p.cooldown2Total,
         canal: p.canalizando
           ? {
               nombre: ITEM_INFO[p.canalizando.tipo].nombre,
@@ -312,10 +432,39 @@ export function Game() {
     setPalanca({ x: 0, y: 0 });
   };
 
-  const pulsar = (accion: "habilidad" | "recoger" | "cancelar", item?: ItemKind) => {
+  const pulsar = (accion: "habilidad" | "habilidad2" | "recoger" | "cancelar", item?: ItemKind) => {
     if (item) pulsos.current.item = item;
     else pulsos.current[accion] = true;
   };
+
+  const panelTeclas = (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="text-sm font-semibold">Teclas</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Pulsa un botón y luego la tecla que quieras usar.
+      </p>
+      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {ACCIONES.map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => setCapturando(a)}
+            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition ${
+              capturando === a ? "border-primary bg-primary/10" : "border-border hover:bg-accent"
+            }`}
+          >
+            <span>{ACCION_NOMBRE[a]}</span>
+            <span className="font-mono text-[11px] text-primary">
+              {capturando === a ? "Pulsa una tecla…" : teclas[a] ? nombreTecla(teclas[a]) : "—"}
+            </span>
+          </button>
+        ))}
+      </div>
+      <Button onClick={restaurarTeclas} variant="outline" size="sm" className="mt-3 w-full">
+        Restaurar teclas por defecto
+      </Button>
+    </div>
+  );
 
   if (fase === "menu") {
     return (
@@ -351,6 +500,12 @@ export function Game() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-semibold text-primary">
+                    {ABILITY2_INFO[a].nombre} ({ABILITY2_INFO[a].cooldown}s)
+                  </span>{" "}
+                  — {ABILITY2_INFO[a].desc}
+                </p>
               </button>
             ))}
           </div>
@@ -451,7 +606,8 @@ export function Game() {
                 <li className="sm:hidden">Palanca y botones en pantalla</li>
                 <li>WASD / flechas — mover</li>
                 <li>Shift — correr</li>
-                <li>Espacio — habilidad</li>
+                <li>{nombreTecla(teclas.habilidad)} — habilidad 1</li>
+                <li>{nombreTecla(teclas.habilidad2)} — habilidad 2</li>
                 <li>E — recoger objeto</li>
                 <li>1 / 2 / 3 — botiquín / cola / antídoto</li>
                 <li>Esc — cancelar acción</li>
@@ -472,6 +628,8 @@ export function Game() {
               </ul>
             </div>
           </div>
+
+          <div className="mt-6">{panelTeclas}</div>
         </div>
       </main>
     );
@@ -550,6 +708,20 @@ export function Game() {
                       width: `${hud.cooldown > 0 ? 100 - (hud.cooldown / hud.cooldownTotal) * 100 : 100}%`,
                     }}
                   />
+                </div>
+                <div className="mt-2 h-2 rounded bg-white/10">
+                  <div
+                    className="h-2 rounded bg-blue-400"
+                    style={{
+                      width: `${hud.cooldown2 > 0 ? 100 - (hud.cooldown2 / hud.cooldown2Total) * 100 : 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                  {ABILITY2_INFO[habilidad].nombre}:{" "}
+                  {hud.cooldown2 > 0
+                    ? `${hud.cooldown2.toFixed(1)}s`
+                    : `lista (${nombreTecla(teclas.habilidad2)})`}
                 </div>
                 <div className="mt-1 font-mono text-[11px] text-muted-foreground">
                   {hud.escudoActivo
@@ -648,7 +820,7 @@ export function Game() {
           Ajustes
         </Button>
         {ajustes && (
-          <div className="absolute bottom-16 right-4 w-64 rounded-xl border border-border bg-card p-4 shadow-xl">
+          <div className="absolute bottom-16 right-4 z-30 w-72 rounded-xl border border-border bg-card p-4 shadow-xl">
             <h3 className="text-sm font-semibold">Ajustes</h3>
             <label className="mt-3 flex cursor-pointer items-center justify-between text-xs">
               <span>Debug: ver hitboxes</span>
@@ -659,6 +831,7 @@ export function Game() {
                 className="accent-primary"
               />
             </label>
+            <div className="mt-3 max-h-64 overflow-y-auto">{panelTeclas}</div>
             <Button
               onClick={() => setFase("menu")}
               variant="outline"
@@ -731,12 +904,16 @@ export function Game() {
               className="col-span-2 h-12 touch-none"
             >Correr</Button>
             <Button type="button" aria-label="Usar habilidad" onPointerDown={() => pulsar("habilidad")} className="col-span-2 h-12 touch-none"><Hand /> Habilidad</Button>
+            <Button type="button" variant="secondary" aria-label="Usar segunda habilidad" onPointerDown={() => pulsar("habilidad2")} className="col-span-4 h-12 touch-none"><Sparkles /> {ABILITY2_INFO[habilidad].nombre}</Button>
           </div>
         </div>
       )}
 
       <p className="mt-3 hidden font-mono text-[11px] text-muted-foreground sm:block">
-        WASD mover · Shift correr · Espacio habilidad · E recoger · 1/2 usar objeto · Esc cancelar
+        Mover {nombreTecla(teclas.up)}{nombreTecla(teclas.left)}{nombreTecla(teclas.down)}
+        {nombreTecla(teclas.right)} · Correr {nombreTecla(teclas.run)} · Habilidad{" "}
+        {nombreTecla(teclas.habilidad)} · Habilidad 2 {nombreTecla(teclas.habilidad2)} · Recoger{" "}
+        {nombreTecla(teclas.recoger)} · Cancelar {nombreTecla(teclas.cancelar)}
       </p>
     </main>
   );
