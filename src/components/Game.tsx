@@ -95,6 +95,7 @@ function leerTeclas(): Record<Accion, string> {
 
 type Hud = {
   hp: number;
+  maxHp: number;
   sp: number;
   spFrac: number;
   agotado: boolean;
@@ -377,6 +378,7 @@ export function Game() {
         reviveFrac: Math.min(1, p.revive / SUFRIMIENTO.segundosRevivir),
         peligro,
         hp: Math.max(0, Math.round(p.hp)),
+        maxHp: p.maxHp,
         sp: spMostrado,
         spFrac: p.maxSp > 0 ? spMostrado / p.maxSp : 0,
         agotado: p.agotado,
@@ -662,12 +664,12 @@ export function Game() {
               <div className="rounded-md bg-background/80 p-2 backdrop-blur sm:rounded-lg sm:p-3">
                 <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
                   <span>{ABILITY_INFO[habilidad].nombre}</span>
-                  <span>{hud.hp} HP{hud.escudo ? ` +${hud.escudo}` : ""}</span>
+                  <span>{hud.hp}/{hud.maxHp} HP{hud.escudo ? ` +${hud.escudo}` : ""}</span>
                 </div>
                 <div className="mt-1 h-2 rounded bg-white/10">
                   <div
                     className={`h-2 rounded transition-[width] ${hud.sufriendo ? "bg-destructive" : "bg-primary"}`}
-                    style={{ width: `${hud.hp}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, (hud.hp / hud.maxHp) * 100))}%` }}
                   />
                 </div>
                 <div className="mt-1 flex items-center gap-1.5">
