@@ -1131,6 +1131,9 @@ function iaAsesino(st: GameState, e: Entity, dt: number) {
       }
       if (e.ability === "venenoso" && d < 220) usarHabilidad(st, e);
     }
+    if (st.t >= e.cooldown2Hasta && !e.superAtaque && d < 260) {
+      usarHabilidad2(st, e); // prepara el superataque al acercarse a su presa
+    }
   } else {
     e.rol = "patrullar";
     e.objetivoId = null;
