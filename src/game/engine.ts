@@ -37,7 +37,7 @@ export const ABILITY_INFO: Record<
   atacante: {
     nombre: "Atacante",
     cooldown: 35,
-    desc: "Golpe amplio en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s.",
+    desc: "Golpe amplio en la dirección de avance. Aturde asesinos 5 s y te da 1.5x velocidad por 2 s. Tiene 150 HP y recibe 15% menos de daño, pero camina y corre 0.25x más lento.",
   },
   asustadizo: {
     nombre: "Asustadizo",
@@ -316,8 +316,8 @@ function nuevaEntidad(
     x,
     y,
     r: 15,
-    hp: ability === "medico" ? MEDICO_MAX_HP : 100,
-    maxHp: ability === "medico" ? MEDICO_MAX_HP : 100,
+    hp: ability === "medico" ? MEDICO_MAX_HP : ability === "atacante" ? 150 : 100,
+    maxHp: ability === "medico" ? MEDICO_MAX_HP : ability === "atacante" ? 150 : 100,
 
     sp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
     maxSp: team === "killer" ? STAMINA.maxAsesino : STAMINA.maxSobreviviente,
@@ -495,6 +495,7 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (e.sufriendo) return SURV_WALK * SUFRIMIENTO.lentitud;
   const esSurv = e.team === "survivor";
   let base = esSurv ? (corriendo ? SURV_RUN : SURV_WALK) : corriendo ? KILL_RUN : KILL_WALK;
+  if (e.ability === "atacante") base *= 0.75; // el atacante es 0.25x más lento
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
   if (conBoost) base *= e.boost!.mult;
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
@@ -534,6 +535,7 @@ function danar(st: GameState, e: Entity, cantidad: number) {
   if (e.sufriendo) return; // arrastrándose no se recibe daño externo
   // en sobreadrenalina recibes un 10% más de daño
   let d = e.adrenalina > 0 ? cantidad * 1.1 : cantidad;
+  if (e.ability === "atacante") d *= 0.85; // el atacante recibe 15% menos de daño
   if (e.escudo && st.t < e.escudo.hasta) {
     const absorbido = Math.min(e.escudo.hp, d);
     e.escudo.hp -= absorbido;
