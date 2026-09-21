@@ -88,6 +88,13 @@ export const ABILITY2_INFO: Record<
   },
 };
 
+/** Segunda habilidad común a todos los asesinos. */
+export const KILLER_ABILITY2 = {
+  nombre: "Superataque",
+  cooldown: 20,
+  desc: "Prepara un golpe que quita un 25% más de vida de lo habitual.",
+};
+
 export const MEDICO_MAX_HP = 50;
 export const ADRENALINA_HP = 100;
 export const ADRENALINA_DRENAJE = 4.5;
@@ -148,9 +155,11 @@ export type Entity = {
   isPlayer: boolean;
   cooldownHasta: number;
   cooldownTotal: number;
-  /** segunda habilidad (sólo sobrevivientes) */
+  /** segunda habilidad */
   cooldown2Hasta: number;
   cooldown2Total: number;
+  /** asesinos: siguiente golpe hace 25% más de daño */
+  superAtaque: boolean;
   /** atacante: tiempo de bloqueo activo */
   bloqueoHasta: number;
   /** asustadizo: HP temporal de sobreadrenalina */
@@ -330,7 +339,10 @@ function nuevaEntidad(
     cooldownTotal: ABILITY_INFO[ability].cooldown,
     cooldown2Hasta: 0,
     cooldown2Total:
-      team === "survivor" ? ABILITY2_INFO[ability as SurvivorAbility].cooldown : 0,
+      team === "survivor"
+        ? ABILITY2_INFO[ability as SurvivorAbility].cooldown
+        : KILLER_ABILITY2.cooldown,
+    superAtaque: false,
     bloqueoHasta: 0,
     adrenalina: 0,
 
