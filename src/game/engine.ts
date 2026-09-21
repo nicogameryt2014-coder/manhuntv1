@@ -762,11 +762,17 @@ export function usarHabilidad(st: GameState, e: Entity) {
   e.cooldownTotal = cd;
 }
 
-/** Segunda habilidad de los sobrevivientes. */
+/** Segunda habilidad (sobrevivientes) / superataque (asesinos). */
 export function usarHabilidad2(st: GameState, e: Entity) {
   if (!e.vivo || e.sufriendo || st.t < e.stunHasta) return;
-  if (e.team !== "survivor") return;
   if (st.t < e.cooldown2Hasta) return;
+  if (e.team === "killer") {
+    e.superAtaque = true;
+    e.cooldown2Hasta = st.t + KILLER_ABILITY2.cooldown;
+    e.cooldown2Total = KILLER_ABILITY2.cooldown;
+    msg(st, `${e.nombre} prepara un superataque`);
+    return;
+  }
   const ab = e.ability as SurvivorAbility;
   const cd = ABILITY2_INFO[ab].cooldown;
   switch (ab) {
@@ -862,7 +868,13 @@ function golpeAsesino(st: GameState, k: Entity, objetivo: Entity) {
     st.golpes.push({ id: objetivo.id, t: st.t, x: objetivo.x, y: objetivo.y });
     salpicar(st, objetivo.x, objetivo.y, 7, 1);
   }
-  danar(st, objetivo, 20);
+  let dano = 20;
+  if (k.superAtaque) {
+    dano *= 1.25;
+    k.superAtaque = false;
+    msg(st, `¡Superataque de ${k.nombre}!`);
+  }
+  danar(st, objetivo, dano);
   if (k.ability === "venenoso" && st.t < k.venenoArmadoHasta) {
     objetivo.veneno = { hasta: st.t + 6, sig: st.t + 1 };
   }
