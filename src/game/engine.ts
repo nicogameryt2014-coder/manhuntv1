@@ -1385,7 +1385,47 @@ export function abrirSalida(st: GameState) {
   }
 }
 
-export function step(st: GameState, dt: number, input: Input) {
+/** Aplica un input (local o remoto) sobre una entidad controlada por una persona. */
+export function aplicarInput(st: GameState, jugador: Entity, input: Input, dt: number) {
+  if (!jugador.vivo) return;
+  let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+  const moviendo = dx !== 0 || dy !== 0;
+  if (moviendo) {
+    const l = Math.hypot(dx, dy);
+    dx /= l;
+    dy /= l;
+    jugador.fx = dx;
+    jugador.fy = dy;
+    if (jugador.canalizando) cancelarCanal(jugador);
+  }
+  if (input.cancelar) {
+    if (jugador.canalizando) cancelarCanal(jugador);
+    else if (jugador.ability === "mago" && jugador.escudoActivoSobre !== null)
+      cancelarEscudoMago(st, jugador);
+  }
+  if (!jugador.sufriendo) {
+    if (input.usarHabilidad) usarHabilidad(st, jugador);
+    if (input.usarHabilidad2) usarHabilidad2(st, jugador);
+    if (input.recoger) intentarRecoger(st, jugador);
+    if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+  } else if (input.usarItem === "antidoto") {
+    iniciarItem(st, jugador, "antidoto");
+  }
+
+  const corriendo = input.run && puedeCorrer(jugador);
+  if (corriendo && moviendo) jugador.corrio = true;
+  const v = velocidad(jugador, st, corriendo) * dt;
+  if (moviendo && v > 0) mover(jugador, dx * v, dy * v, st);
+  if (jugador.canalizando && st.t >= jugador.canalizando.fin) terminarCanal(st, jugador);
+}
+
+export function step(
+  st: GameState,
+  dt: number,
+  input: Input,
+  remotos?: Record<number, Input>,
+) {
   if (st.estado !== "jugando") return;
   st.t += dt;
   if (st.fase === "caza") {
