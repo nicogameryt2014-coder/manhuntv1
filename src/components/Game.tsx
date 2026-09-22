@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
-import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TouchControls } from "@/components/TouchControls";
 import {
