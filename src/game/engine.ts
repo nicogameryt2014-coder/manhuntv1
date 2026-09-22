@@ -69,7 +69,7 @@ export const ABILITY2_INFO: Record<
   medico: {
     nombre: "Carrera médica",
     cooldown: 30,
-    desc: "Velocidad x3 por 7 s; luego quedas ralentizado 4 s.",
+    desc: "Velocidad x1.5 por 7 s; luego quedas ralentizado 4 s.",
   },
   atacante: {
     nombre: "Bloqueo",
@@ -79,7 +79,7 @@ export const ABILITY2_INFO: Record<
   asustadizo: {
     nombre: "Sobreadrenalina",
     cooldown: 45,
-    desc: "+100 HP temporal que se gasta a 4.5/s, pero recibes un 10% más de daño mientras dure.",
+    desc: "+100 HP temporal que se gasta a 4.5/s; te mueves 0.5x más lento y recibes un 10% más de daño mientras dure.",
   },
   mago: {
     nombre: "Escudo propio",
@@ -510,6 +510,7 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (e.ability === "atacante") base *= 0.75; // el atacante es 0.25x más lento
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
   if (conBoost) base *= e.boost!.mult;
+  if (e.adrenalina > 0) base *= 0.5; // sobreadrenalina: 0.5x más lento
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
   return base;
 }
@@ -777,7 +778,7 @@ export function usarHabilidad2(st: GameState, e: Entity) {
   const cd = ABILITY2_INFO[ab].cooldown;
   switch (ab) {
     case "medico": {
-      e.boost = { mult: 3, hasta: st.t + 7 };
+      e.boost = { mult: 1.5, hasta: st.t + 7 }; // carrera médica nerfeada (0.5x más lenta)
       e.slowHasta = st.t + 11;
       break;
     }
