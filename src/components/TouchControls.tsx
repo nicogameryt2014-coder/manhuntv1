@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Check, FlaskConical, Hand, Move, PackageOpen, RotateCcw, ShieldPlus, Sparkles, X } from "lucide-react";
+import { Check, FlaskConical, Hand, Move, PackageOpen, RotateCcw, ShieldPlus, Sparkles, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ItemKind } from "@/game/engine";
 

@@ -510,6 +510,7 @@ export function velocidad(e: Entity, st: GameState, corriendo: boolean): number 
   if (e.ability === "atacante") base *= 0.75; // el atacante es 0.25x más lento
   const conBoost = !!(e.boost && st.t < e.boost.hasta);
   if (conBoost) base *= e.boost!.mult;
+  if (e.adrenalina > 0) base *= 0.5; // sobreadrenalina: 0.5x más lento
   if (st.t < e.slowHasta && !conBoost) base *= 0.45;
   return base;
 }
@@ -777,7 +778,7 @@ export function usarHabilidad2(st: GameState, e: Entity) {
   const cd = ABILITY2_INFO[ab].cooldown;
   switch (ab) {
     case "medico": {
-      e.boost = { mult: 3, hasta: st.t + 7 };
+      e.boost = { mult: 1.5, hasta: st.t + 7 }; // carrera médica nerfeada (0.5x más lenta)
       e.slowHasta = st.t + 11;
       break;
     }
