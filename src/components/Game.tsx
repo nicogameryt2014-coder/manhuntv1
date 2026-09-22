@@ -674,6 +674,20 @@ export function Game() {
                     style={{ width: `${Math.max(0, Math.min(100, (hud.hp / hud.maxHp) * 100))}%` }}
                   />
                 </div>
+                {hud.adrenalina > 0 && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span className="w-6 shrink-0 font-mono text-[10px] text-fuchsia-300">ADR</span>
+                    <div className="h-2 flex-1 rounded bg-white/10">
+                      <div
+                        className="h-2 rounded bg-fuchsia-400"
+                        style={{ width: `${Math.min(100, hud.adrenalina)}%` }}
+                      />
+                    </div>
+                    <span className="w-10 shrink-0 text-right font-mono text-[10px] text-fuchsia-300">
+                      +{hud.adrenalina}
+                    </span>
+                  </div>
+                )}
                 <div className="mt-1 flex items-center gap-1.5">
                   <span className="w-6 shrink-0 font-mono text-[10px] text-muted-foreground">SP</span>
                   <div className="h-2 flex-1 rounded bg-white/10">
