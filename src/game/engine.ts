@@ -69,7 +69,7 @@ export const ABILITY2_INFO: Record<
   medico: {
     nombre: "Carrera médica",
     cooldown: 30,
-    desc: "Velocidad x3 por 7 s; luego quedas ralentizado 4 s.",
+    desc: "Velocidad x1.5 por 7 s; luego quedas ralentizado 4 s.",
   },
   atacante: {
     nombre: "Bloqueo",
@@ -79,7 +79,7 @@ export const ABILITY2_INFO: Record<
   asustadizo: {
     nombre: "Sobreadrenalina",
     cooldown: 45,
-    desc: "+100 HP temporal que se gasta a 4.5/s, pero recibes un 10% más de daño mientras dure.",
+    desc: "+100 HP temporal que se gasta a 4.5/s; te mueves 0.5x más lento y recibes un 10% más de daño mientras dure.",
   },
   mago: {
     nombre: "Escudo propio",
