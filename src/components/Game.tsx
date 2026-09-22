@@ -100,6 +100,7 @@ type Hud = {
   spFrac: number;
   agotado: boolean;
   escudo: number;
+  adrenalina: number;
   cooldown: number;
   cooldownTotal: number;
   cooldown2: number;
@@ -383,6 +384,7 @@ export function Game() {
         spFrac: p.maxSp > 0 ? spMostrado / p.maxSp : 0,
         agotado: p.agotado,
         escudo: p.escudo && st.t < p.escudo.hasta ? Math.round(p.escudo.hp) : 0,
+        adrenalina: Math.max(0, Math.round(p.adrenalina)),
         cooldown: Math.max(0, p.cooldownHasta - st.t),
         cooldownTotal: p.cooldownTotal,
         cooldown2: Math.max(0, p.cooldown2Hasta - st.t),
