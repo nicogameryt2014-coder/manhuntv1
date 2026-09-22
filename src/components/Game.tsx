@@ -863,68 +863,21 @@ export function Game() {
       </div>
 
       {tactil && hud?.estado === "jugando" && (
-        <div className="touch-controls grid w-full max-w-[960px] grid-cols-[minmax(8rem,1fr)_minmax(10rem,1.25fr)] items-end gap-3 pt-3 sm:gap-6">
-          <div
-            role="application"
-            aria-label="Palanca de movimiento"
-            onPointerDown={iniciarPalanca}
-            onPointerMove={(ev) => ev.currentTarget.hasPointerCapture(ev.pointerId) && moverPalanca(ev)}
-            onPointerUp={soltarPalanca}
-            onPointerCancel={soltarPalanca}
-            className="relative size-32 touch-none rounded-full border border-border bg-card/80 shadow-lg landscape:size-28"
-          >
-            <div className="absolute inset-4 rounded-full border border-border/70" />
-            <div
-              className="absolute left-1/2 top-1/2 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-primary/60 bg-primary/25 shadow-md"
-              style={{ transform: `translate(calc(-50% + ${palanca.x * 36}px), calc(-50% + ${palanca.y * 36}px))` }}
-            >
-              <span className="sr-only">Mover</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 justify-self-end">
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label="Usar botiquín"
-              disabled={!hud.inventario.includes("botiquin")}
-              onPointerDown={() => pulsar("recoger", "botiquin")}
-              className="size-12 touch-none"
-            ><ShieldPlus /></Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label="Usar cola"
-              disabled={!hud.inventario.includes("cola")}
-              onPointerDown={() => pulsar("recoger", "cola")}
-              className="size-12 touch-none"
-            ><Zap /></Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label="Usar antídoto"
-              disabled={!hud.inventario.includes("antidoto")}
-              onPointerDown={() => pulsar("recoger", "antidoto")}
-              className="size-12 touch-none"
-            ><FlaskConical /></Button>
-            <Button type="button" variant="outline" size="icon" aria-label="Recoger objeto" onPointerDown={() => pulsar("recoger")} className="size-12 touch-none"><PackageOpen /></Button>
-            <Button type="button" variant="outline" size="icon" aria-label="Cancelar acción" onPointerDown={() => pulsar("cancelar")} className="size-12 touch-none"><X /></Button>
-            <Button
-              type="button"
-              variant="secondary"
-              aria-label="Correr"
-              onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); touchRun.current = true; }}
-              onPointerUp={() => { touchRun.current = false; }}
-              onPointerCancel={() => { touchRun.current = false; }}
-              className="col-span-2 h-12 touch-none"
-            >Correr</Button>
-            <Button type="button" aria-label="Usar habilidad" onPointerDown={() => pulsar("habilidad")} className="col-span-2 h-12 touch-none"><Hand /> Habilidad</Button>
-            <Button type="button" variant="secondary" aria-label="Usar segunda habilidad" onPointerDown={() => pulsar("habilidad2")} className="col-span-4 h-12 touch-none"><Sparkles /> {ABILITY2_INFO[habilidad].nombre}</Button>
-          </div>
-        </div>
+        <TouchControls
+          inventario={hud.inventario}
+          nombreHabilidad2={ABILITY2_INFO[habilidad].nombre}
+          palanca={palanca}
+          iniciarPalanca={iniciarPalanca}
+          moverPalanca={moverPalanca}
+          soltarPalanca={soltarPalanca}
+          pulsar={pulsar}
+          correrDown={() => {
+            touchRun.current = true;
+          }}
+          correrUp={() => {
+            touchRun.current = false;
+          }}
+        />
       )}
 
       <p className="mt-3 hidden font-mono text-[11px] text-muted-foreground sm:block">
