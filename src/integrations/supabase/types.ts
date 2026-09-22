@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      salas: {
+        Row: {
+          asesinos: number
+          created_at: string
+          estado: string
+          host: string
+          id: string
+          jugadores: number
+          latido: string
+          maximo: number
+          modo: string
+          nombre: string
+        }
+        Insert: {
+          asesinos?: number
+          created_at?: string
+          estado?: string
+          host: string
+          id?: string
+          jugadores?: number
+          latido?: string
+          maximo?: number
+          modo?: string
+          nombre: string
+        }
+        Update: {
+          asesinos?: number
+          created_at?: string
+          estado?: string
+          host?: string
+          id?: string
+          jugadores?: number
+          latido?: string
+          maximo?: number
+          modo?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
