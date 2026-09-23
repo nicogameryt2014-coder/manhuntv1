@@ -123,6 +123,7 @@ type Hud = {
   escape: boolean;
   escapados: number;
   escapaste: boolean;
+  esAsesino: boolean;
 };
 
 type TouchMove = { x: number; y: number };
@@ -408,6 +409,7 @@ export function Game() {
         escape: st.fase === "escape",
         escapados: st.escapados,
         escapaste: p.escapo,
+        esAsesino: p.team === "killer",
         estado: st.estado,
         mensajes: st.mensajes.map((m) => m.texto).slice(-3),
         escudoActivo: p.escudoActivoSobre !== null,
@@ -842,7 +844,9 @@ export function Game() {
               </div>
               {hud.escape && (
                 <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-[11px] backdrop-blur sm:rounded-lg sm:px-3">
-                  {hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · {hud.escapados} fuera
+                  {hud.esAsesino
+                    ? `¡No dejes escapar a nadie! · ${hud.escapados} fuera`
+                    : `${hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · ${hud.escapados} fuera`}
                 </div>
               )}
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
@@ -878,13 +882,17 @@ export function Game() {
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
                 <h2 className="text-3xl font-black sm:text-4xl">
-                  {hud.estado === "ganado"
-                    ? hud.escapaste
-                      ? "¡Escapaste!"
-                      : "¡Sobreviviste!"
-                    : hud.escape
-                      ? "No llegaste a la salida"
-                      : "Te atraparon"}
+                  {hud.esAsesino
+                    ? hud.estado === "ganado"
+                      ? "¡Cazaste a todos!"
+                      : "Escaparon"
+                    : hud.estado === "ganado"
+                      ? hud.escapaste
+                        ? "¡Escapaste!"
+                        : "¡Sobreviviste!"
+                      : hud.escape
+                        ? "No llegaste a la salida"
+                        : "Te atraparon"}
                 </h2>
                 <p className="font-mono text-xs text-muted-foreground">
                   {hud.escapados} sobreviviente(s) lograron escapar
