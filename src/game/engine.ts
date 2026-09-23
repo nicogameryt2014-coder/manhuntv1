@@ -1419,8 +1419,24 @@ export function aplicarInput(st: GameState, jugador: Entity, input: Input, dt: n
   if (!jugador.sufriendo) {
     if (input.usarHabilidad) usarHabilidad(st, jugador);
     if (input.usarHabilidad2) usarHabilidad2(st, jugador);
-    if (input.recoger) intentarRecoger(st, jugador);
-    if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    if (jugador.team === "survivor") {
+      if (input.recoger) intentarRecoger(st, jugador);
+      if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    } else {
+      // jugador asesino: golpea automáticamente al sobreviviente que tenga al alcance
+      let objetivo: Entity | null = null;
+      let mejorD = Infinity;
+      for (const o of st.entities) {
+        if (o.team !== "survivor" || !o.vivo || o.sufriendo) continue;
+        const d = Math.hypot(o.x - jugador.x, o.y - jugador.y);
+        if (d < mejorD) {
+          mejorD = d;
+          objetivo = o;
+        }
+      }
+      if (objetivo && mejorD < jugador.r + objetivo.r + 10 && st.t > jugador.ataqueListo)
+        golpeAsesino(st, jugador, objetivo);
+    }
   } else if (input.usarItem === "antidoto") {
     iniciarItem(st, jugador, "antidoto");
   }
@@ -1574,11 +1590,18 @@ export function step(
       salpicar(st, e.x, e.y, 26, 1.7);
       st.muertes.push({ id: e.id, t: st.t });
     }
-    st.estado = jugador.escapo ? "ganado" : "perdido";
+    st.estado =
+      jugador.team === "killer"
+        ? st.escapados > 0
+          ? "perdido"
+          : "ganado"
+        : jugador.escapo
+          ? "ganado"
+          : "perdido";
   } else if (jugador.escapo) {
     st.estado = "ganado";
   } else if (survVivos.length === 0) {
-    st.estado = "perdido";
+    st.estado = jugador.team === "killer" ? "ganado" : "perdido";
   }
 }
 
