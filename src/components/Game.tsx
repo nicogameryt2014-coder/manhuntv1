@@ -592,6 +592,10 @@ export function Game() {
             >
               Empezar partida
             </Button>
+            <Button asChild size="lg" variant="secondary" className="h-12 w-full sm:w-auto">
+              <Link to="/online">Jugar en línea</Link>
+            </Button>
+
             <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm">
               <input
                 type="checkbox"
