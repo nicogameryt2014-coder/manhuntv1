@@ -409,10 +409,12 @@ function spawnCerca(ws: Rect[], cx: number, cy: number, usados: { x: number; y: 
 
 export type Config = {
   habilidad: SurvivorAbility;
-  sobrevivientes: number; // 1..20 (incluye al jugador)
-  asesinos: number; // 1..20
+  sobrevivientes: number; // 1..20 (incluye al jugador si es sobreviviente)
+  asesinos: number; // 1..20 (incluye al jugador si es asesino)
   duracion: number;
   modo: ModoMuerte;
+  rol?: "survivor" | "killer"; // por defecto sobreviviente
+  habilidadAsesino?: KillerAbility; // cuando el jugador es asesino
 };
 
 export function crearJuego(cfg: Config): GameState {
@@ -422,8 +424,16 @@ export function crearJuego(cfg: Config): GameState {
   const ents: Entity[] = [];
   const usados: { x: number; y: number }[] = [];
 
-  const spawnSurv = spawnCerca(ws, 150, WORLD_H - 150, usados);
-  ents.push(nuevaEntidad("Tú", "survivor", cfg.habilidad, spawnSurv.x, spawnSurv.y, true));
+  const jugadorEsAsesino = cfg.rol === "killer";
+  if (jugadorEsAsesino) {
+    const spawnK = spawnCerca(ws, WORLD_W / 2, WORLD_H / 2, usados);
+    ents.push(
+      nuevaEntidad("Tú", "killer", cfg.habilidadAsesino ?? "venenoso", spawnK.x, spawnK.y, true),
+    );
+  } else {
+    const spawnSurv = spawnCerca(ws, 150, WORLD_H - 150, usados);
+    ents.push(nuevaEntidad("Tú", "survivor", cfg.habilidad, spawnSurv.x, spawnSurv.y, true));
+  }
 
   const esquinas = [
     { x: 160, y: 140 },
@@ -435,7 +445,8 @@ export function crearJuego(cfg: Config): GameState {
     { x: 160, y: WORLD_H / 2 },
     { x: WORLD_W - 160, y: WORLD_H / 2 },
   ];
-  for (let i = 0; i < Math.max(0, cfg.sobrevivientes - 1); i++) {
+  const botsSurv = jugadorEsAsesino ? cfg.sobrevivientes : cfg.sobrevivientes - 1;
+  for (let i = 0; i < Math.max(0, botsSurv); i++) {
     const a = SURVIVOR_ABILITIES[i % SURVIVOR_ABILITIES.length]!;
     const base = esquinas[i % esquinas.length]!;
     const p = spawnCerca(ws, base.x, base.y, usados);
@@ -444,7 +455,8 @@ export function crearJuego(cfg: Config): GameState {
     );
   }
 
-  for (let i = 0; i < cfg.asesinos; i++) {
+  const botsKiller = jugadorEsAsesino ? cfg.asesinos - 1 : cfg.asesinos;
+  for (let i = 0; i < Math.max(0, botsKiller); i++) {
     const a = KILLER_ABILITIES[i % KILLER_ABILITIES.length]!;
     const p = spawnCerca(ws, WORLD_W / 2, WORLD_H / 2, usados);
     ents.push(
@@ -1407,8 +1419,24 @@ export function aplicarInput(st: GameState, jugador: Entity, input: Input, dt: n
   if (!jugador.sufriendo) {
     if (input.usarHabilidad) usarHabilidad(st, jugador);
     if (input.usarHabilidad2) usarHabilidad2(st, jugador);
-    if (input.recoger) intentarRecoger(st, jugador);
-    if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    if (jugador.team === "survivor") {
+      if (input.recoger) intentarRecoger(st, jugador);
+      if (input.usarItem) iniciarItem(st, jugador, input.usarItem);
+    } else {
+      // jugador asesino: golpea automáticamente al sobreviviente que tenga al alcance
+      let objetivo: Entity | null = null;
+      let mejorD = Infinity;
+      for (const o of st.entities) {
+        if (o.team !== "survivor" || !o.vivo || o.sufriendo) continue;
+        const d = Math.hypot(o.x - jugador.x, o.y - jugador.y);
+        if (d < mejorD) {
+          mejorD = d;
+          objetivo = o;
+        }
+      }
+      if (objetivo && mejorD < jugador.r + objetivo.r + 10 && st.t > jugador.ataqueListo)
+        golpeAsesino(st, jugador, objetivo);
+    }
   } else if (input.usarItem === "antidoto") {
     iniciarItem(st, jugador, "antidoto");
   }
@@ -1562,11 +1590,18 @@ export function step(
       salpicar(st, e.x, e.y, 26, 1.7);
       st.muertes.push({ id: e.id, t: st.t });
     }
-    st.estado = jugador.escapo ? "ganado" : "perdido";
+    st.estado =
+      jugador.team === "killer"
+        ? st.escapados > 0
+          ? "perdido"
+          : "ganado"
+        : jugador.escapo
+          ? "ganado"
+          : "perdido";
   } else if (jugador.escapo) {
     st.estado = "ganado";
   } else if (survVivos.length === 0) {
-    st.estado = "perdido";
+    st.estado = jugador.team === "killer" ? "ganado" : "perdido";
   }
 }
 

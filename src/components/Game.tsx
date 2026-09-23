@@ -7,6 +7,8 @@ import {
   ABILITY2_INFO,
   ITEM_INFO,
   SURVIVOR_ABILITIES,
+  KILLER_ABILITIES,
+  KILLER_ABILITY2,
   crearJuego,
   cambiarEspectado,
   focoCamara,
@@ -14,6 +16,7 @@ import {
   type GameState,
   type Input,
   type ItemKind,
+  type KillerAbility,
   type ModoMuerte,
   type SurvivorAbility,
   SUFRIMIENTO,
@@ -120,6 +123,7 @@ type Hud = {
   escape: boolean;
   escapados: number;
   escapaste: boolean;
+  esAsesino: boolean;
 };
 
 type TouchMove = { x: number; y: number };
@@ -135,6 +139,8 @@ export function Game() {
   const [nSobrevivientes, setNSobrevivientes] = useState(4);
   const [nAsesinos, setNAsesinos] = useState(2);
   const [modo, setModo] = useState<ModoMuerte>("instantanea");
+  const [rol, setRol] = useState<"survivor" | "killer">("survivor");
+  const [habilidadAsesino, setHabilidadAsesino] = useState<KillerAbility>("venenoso");
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -178,10 +184,12 @@ export function Game() {
         asesinos: nAsesinos,
         duracion: 180,
         modo,
+        rol,
+        habilidadAsesino,
       });
       setFase("jugando");
     },
-    [nSobrevivientes, nAsesinos, modo],
+    [nSobrevivientes, nAsesinos, modo, rol, habilidadAsesino],
   );
 
 
@@ -401,6 +409,7 @@ export function Game() {
         escape: st.fase === "escape",
         escapados: st.escapados,
         escapaste: p.escapo,
+        esAsesino: p.team === "killer",
         estado: st.estado,
         mensajes: st.mensajes.map((m) => m.texto).slice(-3),
         escudoActivo: p.escudoActivoSobre !== null,
@@ -485,34 +494,93 @@ export function Game() {
           </p>
 
           <h2 className="mt-8 text-sm font-semibold uppercase tracking-widest text-muted-foreground sm:mt-10">
-            Elige tu habilidad
+            Tu rol
           </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {SURVIVOR_ABILITIES.map((a) => (
+            {(
+              [
+                { id: "survivor" as const, nombre: "Sobreviviente", desc: "Aguanta 3 minutos y escapa por la salida." },
+                { id: "killer" as const, nombre: "Asesino", desc: "Caza a todos los sobrevivientes antes de que escapen." },
+              ]
+            ).map((r) => (
               <button
-                key={a}
-                onClick={() => setHabilidad(a)}
-                className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
-                  habilidad === a
-                    ? "border-primary bg-primary/10"
+                key={r.id}
+                type="button"
+                onClick={() => setRol(r.id)}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  rol === r.id
+                    ? r.id === "killer"
+                      ? "border-destructive bg-destructive/10"
+                      : "border-primary bg-primary/10"
                     : "border-border bg-card hover:bg-accent"
                 }`}
               >
-                <div className="flex items-baseline justify-between">
-                  <span className="font-semibold">{ABILITY_INFO[a].nombre}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {ABILITY_INFO[a].cooldown}s
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-semibold text-primary">
-                    {ABILITY2_INFO[a].nombre} ({ABILITY2_INFO[a].cooldown}s)
-                  </span>{" "}
-                  — {ABILITY2_INFO[a].desc}
-                </p>
+                <span className={`font-semibold ${r.id === "killer" ? "text-destructive" : ""}`}>
+                  {r.nombre}
+                </span>
+                <p className="mt-1 text-xs text-muted-foreground">{r.desc}</p>
               </button>
             ))}
+          </div>
+
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-widest text-muted-foreground sm:mt-10">
+            Elige tu habilidad
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {rol === "survivor"
+              ? SURVIVOR_ABILITIES.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setHabilidad(a)}
+                    className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
+                      habilidad === a
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-semibold">{ABILITY_INFO[a].nombre}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {ABILITY_INFO[a].cooldown}s
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-primary">
+                        {ABILITY2_INFO[a].nombre} ({ABILITY2_INFO[a].cooldown}s)
+                      </span>{" "}
+                      — {ABILITY2_INFO[a].desc}
+                    </p>
+                  </button>
+                ))
+              : KILLER_ABILITIES.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setHabilidadAsesino(a)}
+                    className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
+                      habilidadAsesino === a
+                        ? "border-destructive bg-destructive/10"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-semibold text-destructive">{ABILITY_INFO[a].nombre}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {ABILITY_INFO[a].cooldown}s
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-destructive">
+                        {KILLER_ABILITY2.nombre} ({KILLER_ABILITY2.cooldown}s)
+                      </span>{" "}
+                      — {KILLER_ABILITY2.desc}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Golpeas automáticamente al tener a un sobreviviente al alcance.
+                    </p>
+                  </button>
+                ))}
           </div>
 
           <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
@@ -532,7 +600,9 @@ export function Game() {
                 onChange={(e) => setNSobrevivientes(Number(e.target.value))}
                 className="mt-3 w-full accent-primary"
               />
-              <p className="mt-2 text-xs text-muted-foreground">Tú incluido (1 a 20).</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {rol === "survivor" ? "Tú incluido (1 a 20)." : "Todos controlados por la IA (1 a 20)."}
+              </p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-baseline justify-between text-sm">
@@ -548,7 +618,9 @@ export function Game() {
                 className="mt-3 w-full accent-primary"
               />
               <p className="mt-2 text-xs text-muted-foreground">
-                Se coordinan: uno persigue y el resto flanquea (1 a 20).
+                {rol === "killer"
+                  ? "Tú incluido: el resto son compañeros de la IA (1 a 20)."
+                  : "Se coordinan: uno persigue y el resto flanquea (1 a 20)."}
               </p>
             </div>
           </div>
@@ -776,7 +848,9 @@ export function Game() {
               </div>
               {hud.escape && (
                 <div className="rounded-md bg-background/80 px-2 py-1 font-mono text-[11px] backdrop-blur sm:rounded-lg sm:px-3">
-                  {hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · {hud.escapados} fuera
+                  {hud.esAsesino
+                    ? `¡No dejes escapar a nadie! · ${hud.escapados} fuera`
+                    : `${hud.escapaste ? "Escapaste ✔" : "¡Corre a la salida!"} · ${hud.escapados} fuera`}
                 </div>
               )}
               <div className="hidden rounded-lg bg-background/80 px-3 py-2 font-mono text-[11px] backdrop-blur sm:block">
@@ -812,13 +886,17 @@ export function Game() {
             {hud.estado !== "jugando" && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-xl bg-background/90">
                 <h2 className="text-3xl font-black sm:text-4xl">
-                  {hud.estado === "ganado"
-                    ? hud.escapaste
-                      ? "¡Escapaste!"
-                      : "¡Sobreviviste!"
-                    : hud.escape
-                      ? "No llegaste a la salida"
-                      : "Te atraparon"}
+                  {hud.esAsesino
+                    ? hud.estado === "ganado"
+                      ? "¡Cazaste a todos!"
+                      : "Escaparon"
+                    : hud.estado === "ganado"
+                      ? hud.escapaste
+                        ? "¡Escapaste!"
+                        : "¡Sobreviviste!"
+                      : hud.escape
+                        ? "No llegaste a la salida"
+                        : "Te atraparon"}
                 </h2>
                 <p className="font-mono text-xs text-muted-foreground">
                   {hud.escapados} sobreviviente(s) lograron escapar
