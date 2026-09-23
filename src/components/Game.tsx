@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { TouchControls } from "@/components/TouchControls";
 import {
