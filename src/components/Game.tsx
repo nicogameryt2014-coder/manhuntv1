@@ -492,34 +492,93 @@ export function Game() {
           </p>
 
           <h2 className="mt-8 text-sm font-semibold uppercase tracking-widest text-muted-foreground sm:mt-10">
-            Elige tu habilidad
+            Tu rol
           </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {SURVIVOR_ABILITIES.map((a) => (
+            {(
+              [
+                { id: "survivor" as const, nombre: "Sobreviviente", desc: "Aguanta 3 minutos y escapa por la salida." },
+                { id: "killer" as const, nombre: "Asesino", desc: "Caza a todos los sobrevivientes antes de que escapen." },
+              ]
+            ).map((r) => (
               <button
-                key={a}
-                onClick={() => setHabilidad(a)}
-                className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
-                  habilidad === a
-                    ? "border-primary bg-primary/10"
+                key={r.id}
+                type="button"
+                onClick={() => setRol(r.id)}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  rol === r.id
+                    ? r.id === "killer"
+                      ? "border-destructive bg-destructive/10"
+                      : "border-primary bg-primary/10"
                     : "border-border bg-card hover:bg-accent"
                 }`}
               >
-                <div className="flex items-baseline justify-between">
-                  <span className="font-semibold">{ABILITY_INFO[a].nombre}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {ABILITY_INFO[a].cooldown}s
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-semibold text-primary">
-                    {ABILITY2_INFO[a].nombre} ({ABILITY2_INFO[a].cooldown}s)
-                  </span>{" "}
-                  — {ABILITY2_INFO[a].desc}
-                </p>
+                <span className={`font-semibold ${r.id === "killer" ? "text-destructive" : ""}`}>
+                  {r.nombre}
+                </span>
+                <p className="mt-1 text-xs text-muted-foreground">{r.desc}</p>
               </button>
             ))}
+          </div>
+
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-widest text-muted-foreground sm:mt-10">
+            Elige tu habilidad
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {rol === "survivor"
+              ? SURVIVOR_ABILITIES.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setHabilidad(a)}
+                    className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
+                      habilidad === a
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-semibold">{ABILITY_INFO[a].nombre}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {ABILITY_INFO[a].cooldown}s
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-primary">
+                        {ABILITY2_INFO[a].nombre} ({ABILITY2_INFO[a].cooldown}s)
+                      </span>{" "}
+                      — {ABILITY2_INFO[a].desc}
+                    </p>
+                  </button>
+                ))
+              : KILLER_ABILITIES.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setHabilidadAsesino(a)}
+                    className={`min-h-24 rounded-xl border p-4 text-left transition-colors ${
+                      habilidadAsesino === a
+                        ? "border-destructive bg-destructive/10"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-semibold text-destructive">{ABILITY_INFO[a].nombre}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {ABILITY_INFO[a].cooldown}s
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{ABILITY_INFO[a].desc}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-destructive">
+                        {KILLER_ABILITY2.nombre} ({KILLER_ABILITY2.cooldown}s)
+                      </span>{" "}
+                      — {KILLER_ABILITY2.desc}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Golpeas automáticamente al tener a un sobreviviente al alcance.
+                    </p>
+                  </button>
+                ))}
           </div>
 
           <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
