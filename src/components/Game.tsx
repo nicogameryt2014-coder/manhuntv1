@@ -600,7 +600,9 @@ export function Game() {
                 onChange={(e) => setNSobrevivientes(Number(e.target.value))}
                 className="mt-3 w-full accent-primary"
               />
-              <p className="mt-2 text-xs text-muted-foreground">Tú incluido (1 a 20).</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {rol === "survivor" ? "Tú incluido (1 a 20)." : "Todos controlados por la IA (1 a 20)."}
+              </p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-baseline justify-between text-sm">
@@ -616,7 +618,9 @@ export function Game() {
                 className="mt-3 w-full accent-primary"
               />
               <p className="mt-2 text-xs text-muted-foreground">
-                Se coordinan: uno persigue y el resto flanquea (1 a 20).
+                {rol === "killer"
+                  ? "Tú incluido: el resto son compañeros de la IA (1 a 20)."
+                  : "Se coordinan: uno persigue y el resto flanquea (1 a 20)."}
               </p>
             </div>
           </div>
