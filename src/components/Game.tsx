@@ -7,6 +7,8 @@ import {
   ABILITY2_INFO,
   ITEM_INFO,
   SURVIVOR_ABILITIES,
+  KILLER_ABILITIES,
+  KILLER_ABILITY2,
   crearJuego,
   cambiarEspectado,
   focoCamara,
@@ -14,6 +16,7 @@ import {
   type GameState,
   type Input,
   type ItemKind,
+  type KillerAbility,
   type ModoMuerte,
   type SurvivorAbility,
   SUFRIMIENTO,
@@ -135,6 +138,8 @@ export function Game() {
   const [nSobrevivientes, setNSobrevivientes] = useState(4);
   const [nAsesinos, setNAsesinos] = useState(2);
   const [modo, setModo] = useState<ModoMuerte>("instantanea");
+  const [rol, setRol] = useState<"survivor" | "killer">("survivor");
+  const [habilidadAsesino, setHabilidadAsesino] = useState<KillerAbility>("venenoso");
   const [debug, setDebug] = useState(false);
   const [ajustes, setAjustes] = useState(false);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -178,10 +183,12 @@ export function Game() {
         asesinos: nAsesinos,
         duracion: 180,
         modo,
+        rol,
+        habilidadAsesino,
       });
       setFase("jugando");
     },
-    [nSobrevivientes, nAsesinos, modo],
+    [nSobrevivientes, nAsesinos, modo, rol, habilidadAsesino],
   );
 
 
